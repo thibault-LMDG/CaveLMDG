@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { T, wineTypeEmoji } from '@/lib/theme'
 import type { Wine } from '@/types'
@@ -145,6 +146,31 @@ export default function CavePage() {
           ))}
         </div>
       )}
+
+      {/* FAB — Ajouter un vin */}
+      <Link
+        href="/cave/new"
+        style={{
+          position: 'fixed',
+          bottom: 76,
+          right: 20,
+          width: 52,
+          height: 52,
+          borderRadius: 26,
+          background: T.gold,
+          color: T.sea,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 26,
+          fontWeight: 300,
+          textDecoration: 'none',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+          zIndex: 30,
+        }}
+      >
+        +
+      </Link>
     </div>
   )
 }
