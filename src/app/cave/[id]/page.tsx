@@ -49,12 +49,20 @@ export default function WineDetailPage() {
     <div style={{ padding: '0 0 120px' }}>
       {/* Header */}
       <div style={{ padding: '16px 16px 12px', borderBottom: `0.5px solid ${T.border}` }}>
-        <button
-          onClick={() => router.back()}
-          style={{ background: 'none', border: 'none', color: T.teal, fontSize: 14, cursor: 'pointer', padding: 0, marginBottom: 12 }}
-        >
-          ← Retour
-        </button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <button
+            onClick={() => router.back()}
+            style={{ background: 'none', border: 'none', color: T.teal, fontSize: 14, cursor: 'pointer', padding: 0 }}
+          >
+            ← Retour
+          </button>
+          <Link
+            href={`/cave/${id}/edit`}
+            style={{ padding: '6px 14px', borderRadius: 8, background: T.surface, border: `0.5px solid ${T.border}`, color: T.text2, fontSize: 12, fontWeight: 500, textDecoration: 'none' }}
+          >
+            ✏️ Modifier
+          </Link>
+        </div>
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
           <span style={{
