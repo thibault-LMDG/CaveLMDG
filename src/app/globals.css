@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+:root {
+  --sea: #0a1628;
+  --deep: #0d1f38;
+  --surface: #122240;
+  --card: #172b4d;
+  --border: #1e3a5f;
+  --gold: #e8c87a;
+  --teal: #5bc4b0;
+  --rose: #e87a7a;
+  --blue: #7ab4e8;
+  --purple: #b07ae8;
+  --text: #e8f0f8;
+  --text2: #8ba8c8;
+  --muted: #4a6888;
+  --up: #5bc47a;
+  --down: #e87a7a;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--sea);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* Bottom tab bar safe area */
+body {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: var(--sea);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
+
+/* Focus visible for accessibility */
+:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Smooth transitions */
+a, button {
+  transition: opacity 0.15s ease, background-color 0.15s ease, transform 0.1s ease;
+}
+button:active {
+  transform: scale(0.97);
+}
