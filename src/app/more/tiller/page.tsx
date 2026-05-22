@@ -33,32 +33,11 @@ export default function TillerMappingPage() {
   const [saving, setSaving] = useState(false)
 
   const loadData = useCallback(async () => {
-    // Produits Tiller vin distincts
-    const { data: tillerData } = await supabase.rpc('cave_get_tiller_products').select('*')
-
-    // Fallback: query directe si la RPC n'existe pas
-    let products: TillerProduct[] = []
-    if (!tillerData) {
-      const { data: rawData } = await supabase
-        .from('lignes_produits')
-        .select('produit, ca_ht')
-        .eq('categorie', 'BOISSON_VIN')
-
-      if (rawData) {
-        const grouped: Record<string, { nb: number; ca: number }> = {}
-        rawData.forEach((r: { produit: string; ca_ht: number }) => {
-          if (!grouped[r.produit]) grouped[r.produit] = { nb: 0, ca: 0 }
-          grouped[r.produit].nb++
-          grouped[r.produit].ca += Number(r.ca_ht) || 0
-        })
-        products = Object.entries(grouped)
-          .map(([produit, stats]) => ({ produit, nb_ventes: stats.nb, ca_total: Math.round(stats.ca) }))
-          .sort((a, b) => b.nb_ventes - a.nb_ventes)
-      }
-    } else {
-      products = tillerData as TillerProduct[]
-    }
-    setTillerProducts(products)
+    // Produits Tiller vin — via vue pré-agrégée
+    const { data: tillerData } = await supabase
+      .from('v_cave_tiller_products')
+      .select('*')
+    setTillerProducts((tillerData as TillerProduct[]) || [])
 
     // Vins cave
     const { data: wineData } = await supabase
