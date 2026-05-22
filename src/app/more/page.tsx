@@ -8,7 +8,7 @@ const menuItems = [
   { href: '/more/pricing', emoji: '💰', label: 'Grille de pricing', desc: 'Coefficients et BevCost' },
   { href: '#', emoji: '🖨️', label: 'Carte des vins', desc: 'Génération PDF imprimable', disabled: true },
   { href: '#', emoji: '⚠️', label: 'Alertes', desc: 'Stock bas, dormant, ruptures', disabled: true },
-  { href: '#', emoji: '🔗', label: 'Mapping Tiller', desc: 'Associer vins et caisse', disabled: true },
+  { href: '/more/tiller', emoji: '🔗', label: 'Mapping Tiller', desc: 'Associer vins et caisse' },
   { href: '#', emoji: '📚', label: 'Formation', desc: 'Quiz et parcours vin', disabled: true },
   { href: '#', emoji: '⚙️', label: 'Paramètres', desc: 'Rôles, seuils, sync', disabled: true },
 ]
