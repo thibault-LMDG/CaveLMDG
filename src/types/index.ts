@@ -19,6 +19,7 @@ export interface Domain {
   nom: string
   region: string | null
   notes: string | null
+  commentaire_domaine: string | null
   created_at: string
 }
 
@@ -48,6 +49,8 @@ export interface Wine {
   conditions_franco: string | null
   commentaire_serveur: string | null
   commentaire_client: string | null
+  commentaire_cuvee: string | null
+  accords_carte: string | null
   created_at: string
   updated_at: string
   // Joined

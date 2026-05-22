@@ -34,6 +34,9 @@ export default function NewWinePage() {
   const [conditionsFranco, setConditionsFranco] = useState('')
   const [commentaireServeur, setCommentaireServeur] = useState('')
   const [commentaireClient, setCommentaireClient] = useState('')
+  const [commentaireCuvee, setCommentaireCuvee] = useState('')
+  const [accordsCarte, setAccordsCarte] = useState('')
+  const [generating, setGenerating] = useState(false)
 
   const [showNewAgent, setShowNewAgent] = useState(false)
   const [newAgentNom, setNewAgentNom] = useState('')
@@ -171,6 +174,8 @@ export default function NewWinePage() {
       conditions_franco: conditionsFranco.trim() || null,
       commentaire_serveur: commentaireServeur.trim() || null,
       commentaire_client: commentaireClient.trim() || null,
+      commentaire_cuvee: commentaireCuvee.trim() || null,
+      accords_carte: accordsCarte.trim() || null,
     }).select().single()
     if (err) { setError('Erreur : ' + err.message); setSaving(false) }
     else if (data) { router.push(`/cave/${data.id}`) }
@@ -389,13 +394,65 @@ export default function NewWinePage() {
         <input type="text" value={conditionsFranco} onChange={(e) => setConditionsFranco(e.target.value)} placeholder="ex: 60 bouteilles" style={inputStyle} />
       </div>
 
-      <div style={{ marginBottom: 16 }}>
-        <label style={labelStyle}>Pitch serveur</label>
-        <textarea value={commentaireServeur} onChange={(e) => setCommentaireServeur(e.target.value)} placeholder="Argumentaire pour l'équipe de salle…" rows={3} style={{ ...inputStyle, resize: 'vertical' as const, fontFamily: 'inherit' }} />
-      </div>
-      <div style={{ marginBottom: 16 }}>
-        <label style={labelStyle}>Description client (sur carte)</label>
-        <textarea value={commentaireClient} onChange={(e) => setCommentaireClient(e.target.value)} placeholder="Texte visible sur la carte des vins…" rows={3} style={{ ...inputStyle, resize: 'vertical' as const, fontFamily: 'inherit' }} />
+      {/* Commentaires — bouton générer + champs */}
+      <div style={{ margin: '24px 0 16px', padding: '14px 0', borderTop: `0.5px solid ${T.border}` }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <div style={{ fontSize: 14, fontWeight: 500, color: T.text }}>Commentaires</div>
+          <button
+            onClick={async () => {
+              const selectedDomain = domains.find(d => d.id === domainId)
+              const domainName = selectedDomain?.nom || domainSearch || newDomainNom
+              if (!domainName && !cuvee) { setError('Remplissez au moins le domaine ou la cuvée pour générer'); return }
+              setGenerating(true); setError('')
+              try {
+                // Check if domain already has a comment
+                const existingDomainComment = selectedDomain?.commentaire_domaine
+                const resp = await fetch('/api/generate-comments', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    domaine: domainName, cuvee, cepage, millesime, region, appellation: nomAppellation, type,
+                    existingDomainComment: existingDomainComment || null,
+                  }),
+                })
+                const result = await resp.json()
+                if (result.commentaire_cuvee) setCommentaireCuvee(result.commentaire_cuvee)
+                if (result.commentaire_client) setCommentaireClient(result.commentaire_client)
+                if (result.commentaire_domaine && !existingDomainComment) {
+                  // Save domain comment to DB
+                  if (domainId) {
+                    await supabase.from('cave_domains').update({ commentaire_domaine: result.commentaire_domaine }).eq('id', domainId)
+                  }
+                  setCommentaireServeur(result.commentaire_domaine)
+                } else if (existingDomainComment) {
+                  setCommentaireServeur(existingDomainComment)
+                }
+              } catch { setError('Erreur lors de la génération') }
+              setGenerating(false)
+            }}
+            disabled={generating}
+            style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: T.teal + '20', color: T.teal, fontSize: 12, fontWeight: 500, cursor: generating ? 'wait' : 'pointer', opacity: generating ? 0.5 : 1 }}
+          >
+            {generating ? '⏳ Génération…' : '✨ Générer les commentaires'}
+          </button>
+        </div>
+
+        <div style={{ marginBottom: 12 }}>
+          <label style={labelStyle}>🏠 Le domaine (histoire, terroir)</label>
+          <textarea value={commentaireServeur} onChange={(e) => setCommentaireServeur(e.target.value)} placeholder="Histoire, terroir, philosophie du domaine…" rows={3} style={{ ...inputStyle, resize: 'vertical' as const, fontFamily: 'inherit' }} />
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <label style={labelStyle}>🍷 La cuvée (profil, anecdote)</label>
+          <textarea value={commentaireCuvee} onChange={(e) => setCommentaireCuvee(e.target.value)} placeholder="Profil aromatique, vinification, anecdote de vente…" rows={3} style={{ ...inputStyle, resize: 'vertical' as const, fontFamily: 'inherit' }} />
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <label style={labelStyle}>🍽️ Accords carte LMDG</label>
+          <textarea value={accordsCarte} onChange={(e) => setAccordsCarte(e.target.value)} placeholder="Plats de la carte qui accompagnent ce vin…" rows={2} style={{ ...inputStyle, resize: 'vertical' as const, fontFamily: 'inherit' }} />
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <label style={labelStyle}>📋 Sur la carte (client)</label>
+          <textarea value={commentaireClient} onChange={(e) => setCommentaireClient(e.target.value)} placeholder="Quelques mots vendeurs, max 1 ligne…" rows={2} style={{ ...inputStyle, resize: 'vertical' as const, fontFamily: 'inherit' }} />
+        </div>
       </div>
 
       {error && <div style={{ fontSize: 13, color: T.rose, marginBottom: 12, textAlign: 'center' }}>{error}</div>}

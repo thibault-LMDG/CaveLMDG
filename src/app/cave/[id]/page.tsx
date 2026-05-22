@@ -20,7 +20,7 @@ export default function WineDetailPage() {
   const loadData = useCallback(async () => {
     const { data } = await supabase
       .from('cave_wines')
-      .select('*, cave_domains(nom), cave_agents(nom, telephone)')
+      .select('*, cave_domains(nom, commentaire_domaine), cave_agents(nom, telephone)')
       .eq('id', id)
       .single()
     setWine(data as typeof wine)
@@ -124,23 +124,43 @@ export default function WineDetailPage() {
         ))}
       </div>
 
-      {/* Pitch serveur */}
-      {wine.commentaire_serveur && (
-        <div style={{ margin: '0 16px 16px', padding: 14, borderRadius: 10, background: T.gold + '0c', borderLeft: `3px solid ${T.gold}` }}>
-          <div style={{ fontSize: 10, color: T.gold, fontWeight: 500, textTransform: 'uppercase', marginBottom: 6, letterSpacing: 0.5 }}>
-            Pitch serveur
+      {/* 🏠 Le domaine */}
+      {wine.cave_domains?.commentaire_domaine && (
+        <div style={{ margin: '0 16px 12px', padding: 14, borderRadius: 10, background: T.deep, border: `0.5px solid ${T.border}` }}>
+          <div style={{ fontSize: 10, color: T.teal, fontWeight: 500, textTransform: 'uppercase', marginBottom: 6, letterSpacing: 0.5 }}>
+            🏠 Le domaine
           </div>
-          <div style={{ fontSize: 14, color: T.text, lineHeight: 1.5 }}>{wine.commentaire_serveur}</div>
+          <div style={{ fontSize: 13, color: T.text2, lineHeight: 1.5 }}>{wine.cave_domains.commentaire_domaine}</div>
         </div>
       )}
 
-      {/* Description client */}
-      {wine.commentaire_client && (
-        <div style={{ margin: '0 16px 16px', padding: 14, borderRadius: 10, background: T.deep, border: `0.5px solid ${T.border}` }}>
-          <div style={{ fontSize: 10, color: T.text2, fontWeight: 500, textTransform: 'uppercase', marginBottom: 6, letterSpacing: 0.5 }}>
-            Sur la carte
+      {/* 🍷 La cuvée */}
+      {wine.commentaire_cuvee && (
+        <div style={{ margin: '0 16px 12px', padding: 14, borderRadius: 10, background: T.gold + '0c', borderLeft: `3px solid ${T.gold}` }}>
+          <div style={{ fontSize: 10, color: T.gold, fontWeight: 500, textTransform: 'uppercase', marginBottom: 6, letterSpacing: 0.5 }}>
+            🍷 La cuvée
           </div>
-          <div style={{ fontSize: 14, color: T.text2, lineHeight: 1.5, fontStyle: 'italic' }}>{wine.commentaire_client}</div>
+          <div style={{ fontSize: 13, color: T.text, lineHeight: 1.5 }}>{wine.commentaire_cuvee}</div>
+        </div>
+      )}
+
+      {/* 🍽️ Accords carte */}
+      {wine.accords_carte && (
+        <div style={{ margin: '0 16px 12px', padding: 14, borderRadius: 10, background: T.deep, border: `0.5px solid ${T.border}` }}>
+          <div style={{ fontSize: 10, color: T.up, fontWeight: 500, textTransform: 'uppercase', marginBottom: 6, letterSpacing: 0.5 }}>
+            🍽️ Accords carte
+          </div>
+          <div style={{ fontSize: 13, color: T.text2, lineHeight: 1.5 }}>{wine.accords_carte}</div>
+        </div>
+      )}
+
+      {/* 📋 Sur la carte (client) */}
+      {wine.commentaire_client && (
+        <div style={{ margin: '0 16px 16px', padding: 14, borderRadius: 10, background: T.purple + '0c', borderLeft: `3px solid ${T.purple}` }}>
+          <div style={{ fontSize: 10, color: T.purple, fontWeight: 500, textTransform: 'uppercase', marginBottom: 6, letterSpacing: 0.5 }}>
+            📋 Sur la carte
+          </div>
+          <div style={{ fontSize: 14, color: T.text, lineHeight: 1.5, fontStyle: 'italic', fontWeight: 500 }}>{wine.commentaire_client}</div>
         </div>
       )}
 
