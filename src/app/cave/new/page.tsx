@@ -402,24 +402,31 @@ export default function NewWinePage() {
             onClick={async () => {
               const selectedDomain = domains.find(d => d.id === domainId)
               const domainName = selectedDomain?.nom || domainSearch || newDomainNom
-              if (!domainName && !cuvee) { setError('Remplissez au moins le domaine ou la cuvée pour générer'); return }
+              if (!domainName && !cuvee) { setError('Remplissez au moins le domaine ou la cuvée'); return }
               setGenerating(true); setError('')
               try {
-                // Check if domain already has a comment
                 const existingDomainComment = selectedDomain?.commentaire_domaine
                 const resp = await fetch('/api/generate-comments', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
-                    domaine: domainName, cuvee, cepage, millesime, region, appellation: nomAppellation, type,
+                    domaine: domainName, cuvee, millesime, region, appellation: nomAppellation, type,
                     existingDomainComment: existingDomainComment || null,
                   }),
                 })
+                if (!resp.ok) {
+                  const err = await resp.json()
+                  setError(err.error || 'Erreur API'); setGenerating(false); return
+                }
                 const result = await resp.json()
+                // Cépages
+                if (result.cepage && !cepage) setCepage(result.cepage)
+                // Cuvée
                 if (result.commentaire_cuvee) setCommentaireCuvee(result.commentaire_cuvee)
+                // Client
                 if (result.commentaire_client) setCommentaireClient(result.commentaire_client)
+                // Domaine
                 if (result.commentaire_domaine && !existingDomainComment) {
-                  // Save domain comment to DB
                   if (domainId) {
                     await supabase.from('cave_domains').update({ commentaire_domaine: result.commentaire_domaine }).eq('id', domainId)
                   }
@@ -433,7 +440,7 @@ export default function NewWinePage() {
             disabled={generating}
             style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: T.teal + '20', color: T.teal, fontSize: 12, fontWeight: 500, cursor: generating ? 'wait' : 'pointer', opacity: generating ? 0.5 : 1 }}
           >
-            {generating ? '⏳ Génération…' : '✨ Générer les commentaires'}
+            {generating ? '⏳ Génération…' : '✨ Générer'}
           </button>
         </div>
 
