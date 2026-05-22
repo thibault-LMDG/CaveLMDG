@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { T, wineTypeColor, wineTypeEmoji } from '@/lib/theme'
 import type { Wine, StockMovement } from '@/types'
@@ -143,13 +144,16 @@ export default function WineDetailPage() {
       )}
 
       {/* Agent */}
-      {wine.cave_agents && (
+      {wine.cave_agents && wine.agent_id && (
         <div style={{ margin: '0 16px 16px', padding: 14, borderRadius: 10, background: T.deep, border: `0.5px solid ${T.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
+          <Link
+            href={`/more/agents/${wine.agent_id}`}
+            style={{ textDecoration: 'none', color: T.text, flex: 1 }}
+          >
             <div style={{ fontSize: 10, color: T.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Agent</div>
-            <div style={{ fontSize: 14, color: T.text, marginTop: 2 }}>{wine.cave_agents.nom}</div>
+            <div style={{ fontSize: 14, color: T.teal, marginTop: 2 }}>{wine.cave_agents.nom} ›</div>
             {wine.conditions_franco && <div style={{ fontSize: 11, color: T.muted, marginTop: 2 }}>Franco: {wine.conditions_franco}</div>}
-          </div>
+          </Link>
           {wine.cave_agents.telephone && (
             <a
               href={`tel:${wine.cave_agents.telephone.replace(/\s/g, '')}`}
