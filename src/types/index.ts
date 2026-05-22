@@ -5,6 +5,9 @@ export type MovementType = 'entree' | 'vente' | 'offert' | 'casse' | 'cuisine' |
 export interface Agent {
   id: string
   nom: string
+  nom_famille: string | null
+  prenom: string | null
+  entreprise: string | null
   telephone: string | null
   email: string | null
   notes: string | null
