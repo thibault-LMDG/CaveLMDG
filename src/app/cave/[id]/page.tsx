@@ -15,6 +15,7 @@ export default function WineDetailPage() {
   const [movements, setMovements] = useState<StockMovement[]>([])
   const [loading, setLoading] = useState(true)
   const [stockMode, setStockMode] = useState<'entree' | 'sortie' | null>(null)
+  const [confirmArchive, setConfirmArchive] = useState(false)
 
   const loadData = useCallback(async () => {
     const { data } = await supabase
@@ -193,6 +194,33 @@ export default function WineDetailPage() {
           ))}
         </div>
       )}
+
+      {/* Archiver / Supprimer */}
+      <div style={{ margin: '0 16px 16px', textAlign: 'center' }}>
+        {!confirmArchive ? (
+          <button onClick={() => setConfirmArchive(true)} style={{ background: 'none', border: 'none', color: T.muted, fontSize: 12, cursor: 'pointer', padding: 4, textDecoration: 'underline', textUnderlineOffset: 3 }}>
+            Archiver ce vin
+          </button>
+        ) : (
+          <div style={{ padding: 12, background: T.rose + '12', borderRadius: 10, border: `0.5px solid ${T.rose}30` }}>
+            <div style={{ fontSize: 13, color: T.rose, marginBottom: 8 }}>Archiver ce vin ? Il disparaîtra de la cave et de la carte.</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={async () => {
+                  await supabase.from('cave_wines').update({ statut: 'archive' }).eq('id', wine.id)
+                  router.push('/cave')
+                }}
+                style={{ flex: 1, padding: '10px 0', borderRadius: 8, border: 'none', background: T.rose, color: '#fff', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
+              >
+                Oui, archiver
+              </button>
+              <button onClick={() => setConfirmArchive(false)} style={{ flex: 1, padding: '10px 0', borderRadius: 8, border: `0.5px solid ${T.border}`, background: 'transparent', color: T.text2, fontSize: 13, cursor: 'pointer' }}>
+                Annuler
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Action bar fixe en bas */}
       <div style={{

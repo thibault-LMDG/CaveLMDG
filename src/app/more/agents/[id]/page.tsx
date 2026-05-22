@@ -16,6 +16,7 @@ export default function AgentDetailPage() {
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({ nom: '', nom_famille: '', entreprise: '', telephone: '', email: '', notes: '' })
   const [saving, setSaving] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -47,6 +48,16 @@ export default function AgentDetailPage() {
     setAgent(data as Agent)
     setEditing(false)
     setSaving(false)
+  }
+
+  async function handleDelete() {
+    if (wines.length > 0) {
+      alert(`Impossible de supprimer : ${wines.length} vin(s) sont liés à cet agent. Réassignez-les d'abord.`)
+      setConfirmDelete(false)
+      return
+    }
+    await supabase.from('cave_agents').delete().eq('id', id)
+    router.push('/more/agents')
   }
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: T.muted }}>Chargement…</div>
@@ -117,6 +128,20 @@ export default function AgentDetailPage() {
             <button onClick={handleSave} disabled={saving} style={{ width: '100%', padding: '12px 0', borderRadius: 8, border: 'none', background: T.gold, color: T.sea, fontSize: 14, fontWeight: 500, cursor: 'pointer', opacity: saving ? 0.5 : 1 }}>
               {saving ? 'Enregistrement…' : 'Sauvegarder'}
             </button>
+            {/* Delete */}
+            {!confirmDelete ? (
+              <button onClick={() => setConfirmDelete(true)} style={{ width: '100%', padding: '10px 0', borderRadius: 8, border: 'none', background: 'transparent', color: T.rose, fontSize: 12, cursor: 'pointer', marginTop: 8 }}>
+                Supprimer cet agent
+              </button>
+            ) : (
+              <div style={{ marginTop: 8, padding: 10, background: T.rose + '12', borderRadius: 8, border: `0.5px solid ${T.rose}30`, textAlign: 'center' }}>
+                <div style={{ fontSize: 12, color: T.rose, marginBottom: 8 }}>Confirmer la suppression ?</div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={handleDelete} style={{ flex: 1, padding: '10px 0', borderRadius: 8, border: 'none', background: T.rose, color: '#fff', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>Oui, supprimer</button>
+                  <button onClick={() => setConfirmDelete(false)} style={{ flex: 1, padding: '10px 0', borderRadius: 8, border: `0.5px solid ${T.border}`, background: 'transparent', color: T.text2, fontSize: 13, cursor: 'pointer' }}>Annuler</button>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           /* Mode lecture — coordonnées */
