@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { T, wineTypeColor, wineTypeEmoji } from '@/lib/theme'
 import type { Wine, StockMovement } from '@/types'
+import StockModal from '@/components/StockModal'
 
 export default function WineDetailPage() {
   const { id } = useParams()
@@ -12,27 +13,27 @@ export default function WineDetailPage() {
   const [wine, setWine] = useState<Wine & { cave_domains?: { nom: string }; cave_agents?: { nom: string; telephone: string | null } } | null>(null)
   const [movements, setMovements] = useState<StockMovement[]>([])
   const [loading, setLoading] = useState(true)
+  const [stockMode, setStockMode] = useState<'entree' | 'sortie' | null>(null)
 
-  useEffect(() => {
-    async function load() {
-      const { data } = await supabase
-        .from('cave_wines')
-        .select('*, cave_domains(nom), cave_agents(nom, telephone)')
-        .eq('id', id)
-        .single()
-      setWine(data as typeof wine)
+  const loadData = useCallback(async () => {
+    const { data } = await supabase
+      .from('cave_wines')
+      .select('*, cave_domains(nom), cave_agents(nom, telephone)')
+      .eq('id', id)
+      .single()
+    setWine(data as typeof wine)
 
-      const { data: mvts } = await supabase
-        .from('cave_stock_movements')
-        .select('*')
-        .eq('wine_id', id)
-        .order('created_at', { ascending: false })
-        .limit(20)
-      setMovements((mvts as StockMovement[]) || [])
-      setLoading(false)
-    }
-    load()
+    const { data: mvts } = await supabase
+      .from('cave_stock_movements')
+      .select('*')
+      .eq('wine_id', id)
+      .order('created_at', { ascending: false })
+      .limit(20)
+    setMovements((mvts as StockMovement[]) || [])
+    setLoading(false)
   }, [id])
+
+  useEffect(() => { loadData() }, [loadData])
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: T.muted }}>Chargement…</div>
   if (!wine) return <div style={{ padding: 40, textAlign: 'center', color: T.muted }}>Vin introuvable</div>
@@ -40,9 +41,10 @@ export default function WineDetailPage() {
   const borderColor = wineTypeColor[wine.type] || T.gold
   const coef = wine.coefficient ? wine.coefficient.toFixed(2) : '—'
   const bevcost = wine.bevcost_pct ? (wine.bevcost_pct * 100).toFixed(1) + '%' : '—'
+  const wineName = `${wine.cave_domains?.nom || ''} — ${wine.cuvee || wine.nom_appellation || ''}`
 
   return (
-    <div style={{ padding: '0 0 100px' }}>
+    <div style={{ padding: '0 0 120px' }}>
       {/* Header */}
       <div style={{ padding: '16px 16px 12px', borderBottom: `0.5px solid ${T.border}` }}>
         <button
@@ -178,7 +180,7 @@ export default function WineDetailPage() {
           </div>
           {movements.map((m) => (
             <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: `0.5px solid ${T.border}`, fontSize: 12 }}>
-              <span style={{ color: T.text2 }}>{m.type}</span>
+              <span style={{ color: T.text2 }}>{m.type}{m.motif ? ` (${m.motif})` : ''}</span>
               <span style={{ color: m.quantite > 0 ? T.up : T.down, fontWeight: 500 }}>
                 {m.quantite > 0 ? '+' : ''}{m.quantite}
               </span>
@@ -201,33 +203,54 @@ export default function WineDetailPage() {
         borderTop: `0.5px solid ${T.border}`,
         zIndex: 40,
       }}>
-        <button style={{
-          flex: 1,
-          padding: '12px 0',
-          borderRadius: 10,
-          border: 'none',
-          background: T.up + '18',
-          color: T.up,
-          fontSize: 14,
-          fontWeight: 500,
-          cursor: 'pointer',
-        }}>
+        <button
+          onClick={() => setStockMode('entree')}
+          style={{
+            flex: 1,
+            padding: '14px 0',
+            borderRadius: 10,
+            border: 'none',
+            background: T.up,
+            color: '#fff',
+            fontSize: 15,
+            fontWeight: 500,
+            cursor: 'pointer',
+          }}
+        >
           + Entrée
         </button>
-        <button style={{
-          flex: 1,
-          padding: '12px 0',
-          borderRadius: 10,
-          border: 'none',
-          background: T.rose + '18',
-          color: T.rose,
-          fontSize: 14,
-          fontWeight: 500,
-          cursor: 'pointer',
-        }}>
+        <button
+          onClick={() => setStockMode('sortie')}
+          style={{
+            flex: 1,
+            padding: '14px 0',
+            borderRadius: 10,
+            border: 'none',
+            background: T.rose,
+            color: '#fff',
+            fontSize: 15,
+            fontWeight: 500,
+            cursor: 'pointer',
+          }}
+        >
           − Sortie
         </button>
       </div>
+
+      {/* Stock Modal */}
+      {stockMode && (
+        <StockModal
+          wineId={wine.id}
+          wineName={wineName}
+          currentStock={wine.quantite_stock}
+          mode={stockMode}
+          onClose={() => setStockMode(null)}
+          onSuccess={() => {
+            setStockMode(null)
+            loadData()
+          }}
+        />
+      )}
     </div>
   )
 }
