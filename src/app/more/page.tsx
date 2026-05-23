@@ -10,7 +10,7 @@ const menuItems = [
   { href: '/more/carte', emoji: '🖨️', label: 'Carte des vins', desc: 'Aperçu en stock + PDF imprimable' },
   { href: '#', emoji: '⚠️', label: 'Alertes', desc: 'Stock bas, dormant, ruptures', disabled: true },
   { href: '/more/tiller', emoji: '🔗', label: 'Mapping Tiller', desc: 'Associer vins et caisse' },
-  { href: '#', emoji: '📚', label: 'Formation', desc: 'Quiz et parcours vin', disabled: true },
+  { href: '/more/formation', emoji: '📚', label: 'Formation', desc: 'Quiz, brief et parcours vin' },
   { href: '#', emoji: '⚙️', label: 'Paramètres', desc: 'Rôles, seuils, sync', disabled: true },
 ]
 
