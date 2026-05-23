@@ -22,7 +22,6 @@ interface WineRow {
   cepage: string | null
   millesime: string | null
   prix_vente: string
-  commentaire_cuvee: string | null
   commentaire_client: string | null
   cave_domains: { nom: string } | null
 }
@@ -84,7 +83,7 @@ function buildChapitres(wines: WineRow[]): ChapitreData[] {
         millesime: w.millesime || '',
         cepage: w.cepage || '',
         prix: String(Math.round(parseFloat(w.prix_vente || '0'))),
-        description: w.commentaire_cuvee || w.commentaire_client || '',
+        description: w.commentaire_client || '',
       })
     }
 
@@ -415,7 +414,7 @@ export default function CartePage() {
     setLoading(true)
     const { data } = await supabase
       .from('cave_wines')
-      .select('type, region, cuvee, type_appellation, nom_appellation, cepage, millesime, prix_vente, commentaire_cuvee, commentaire_client, cave_domains(nom)')
+      .select('type, region, cuvee, type_appellation, nom_appellation, cepage, millesime, prix_vente, commentaire_client, cave_domains(nom)')
       .neq('statut', 'archive')
       .gt('quantite_stock', 0)
 
