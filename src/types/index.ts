@@ -44,6 +44,7 @@ export interface Wine {
   emplacement: string | null
   statut: WineStatus
   au_verre: boolean
+  prix_verre: number | null
   verres_par_bouteille: number
   agent_id: string | null
   conditions_franco: string | null

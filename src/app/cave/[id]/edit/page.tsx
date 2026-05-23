@@ -42,6 +42,8 @@ export default function EditWinePage() {
   const [commentaireClient, setCommentaireClient] = useState('')
   const [accordsCarte, setAccordsCarte] = useState('')
   const [auVerre, setAuVerre] = useState(false)
+  const [prixVerre, setPrixVerre] = useState('')
+  const [verresParBouteille, setVerresParBouteille] = useState('6')
   const [stockMinimum, setStockMinimum] = useState('3')
   const [emplacement, setEmplacement] = useState('')
 
@@ -81,6 +83,8 @@ export default function EditWinePage() {
       setCommentaireClient(wine.commentaire_client || '')
       setAccordsCarte(wine.accords_carte || '')
       setAuVerre(wine.au_verre || false)
+      setPrixVerre(wine.prix_verre?.toString() || '')
+      setVerresParBouteille(wine.verres_par_bouteille?.toString() || '6')
       setStockMinimum(wine.stock_minimum?.toString() || '3')
       setEmplacement(wine.emplacement || '')
       setLoading(false)
@@ -103,7 +107,7 @@ export default function EditWinePage() {
       commentaire_cuvee: commentaireCuvee.trim() || null,
       commentaire_client: commentaireClient.trim() || null,
       accords_carte: accordsCarte.trim() || null,
-      au_verre: auVerre, stock_minimum: parseInt(stockMinimum) || 3,
+      au_verre: auVerre, prix_verre: auVerre && prixVerre ? parseFloat(prixVerre) : null, verres_par_bouteille: parseInt(verresParBouteille) || 6, stock_minimum: parseInt(stockMinimum) || 3,
       emplacement: emplacement.trim() || null,
     }).eq('id', id)
     if (err) { setError('Erreur : ' + err.message); setSaving(false) }
@@ -232,10 +236,33 @@ export default function EditWinePage() {
         <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '10px 0' }}>
             <input type="checkbox" checked={auVerre} onChange={(e) => setAuVerre(e.target.checked)} />
-            <span style={{ fontSize: 13, color: T.text }}>Au verre</span>
+            <span style={{ fontSize: 13, color: T.text }}>🍷 Au verre</span>
           </label>
         </div>
       </div>
+
+      {/* Section Au verre — apparaît quand coché */}
+      {auVerre && (
+        <div style={{ padding: '12px 14px', borderRadius: 10, background: `${T.gold}08`, border: `0.5px solid ${T.gold}25`, marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 500, color: T.gold, marginBottom: 10 }}>🍷 Service au verre</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>Prix au verre (€)</label>
+              <input type="number" step="0.5" value={prixVerre} onChange={(e) => setPrixVerre(e.target.value)} placeholder="ex: 8" style={inputStyle} inputMode="decimal" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>Verres / bouteille</label>
+              <input type="number" value={verresParBouteille} onChange={(e) => setVerresParBouteille(e.target.value)} placeholder="6" style={inputStyle} inputMode="numeric" />
+            </div>
+          </div>
+          {prixVerre && prixVente && (
+            <div style={{ fontSize: 11, color: T.text2, marginTop: 8 }}>
+              Marge verre : {((parseFloat(prixVerre) * (parseInt(verresParBouteille) || 6)) / parseFloat(prixVente) * 100 - 100).toFixed(0)}% vs bouteille
+              {' · '}Total verres : {(parseFloat(prixVerre) * (parseInt(verresParBouteille) || 6)).toFixed(0)}€ vs {parseFloat(prixVente).toFixed(0)}€ bouteille
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Commentaires */}
       <div style={{ margin: '24px 0 16px', padding: '14px 0', borderTop: `0.5px solid ${T.border}` }}>
