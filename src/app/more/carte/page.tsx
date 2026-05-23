@@ -291,7 +291,8 @@ function buildFullHTML(
   </div><div class="foot">LA MARINE DES GOUDES&nbsp;·&nbsp;MARSEILLE 8ᵉ · LES GOUDES</div></div>`
 
   // Section Au Verre — dynamique avec les vrais vins cochés au_verre
-  const TYPE_LABEL_VERRE: Record<string, string> = { BULLE: 'BULLES', BLANC: 'BLANCS', ROSÉ: 'ROSÉS', ROUGE: 'ROUGES', 'DEMI-SEC': 'DEMI-SEC' }
+  const TYPE_LABEL_VERRE_S: Record<string, string> = { BULLE: 'BULLES', BLANC: 'BLANCS', ROSÉ: 'ROSÉS', ROUGE: 'ROUGES', 'DEMI-SEC': 'DEMI-SEC' }
+  const TYPE_LABEL_VERRE_1: Record<string, string> = { BULLE: 'BULLE', BLANC: 'BLANC', ROSÉ: 'ROSÉ', ROUGE: 'ROUGE', 'DEMI-SEC': 'DEMI-SEC' }
   const TYPE_ORDER_VERRE = ['BULLE', 'BLANC', 'ROSÉ', 'ROUGE', 'DEMI-SEC']
   
   // Grouper les vins au verre par type
@@ -308,7 +309,7 @@ function buildFullHTML(
       .filter(t => verreByType[t]?.length)
       .map(t => {
         const vins = verreByType[t]
-        const familyLabel = TYPE_LABEL_VERRE[t] || t
+        const familyLabel = vins.length === 1 ? (TYPE_LABEL_VERRE_1[t] || t) : (TYPE_LABEL_VERRE_S[t] || t)
         const vinsList = vins.map(v =>
           `<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2.5mm;">
             <div style="font-family:'CopB';font-size:9pt;color:${GREEN};">${esc(v.domaine)} <span style="font-family:'CopB';font-size:7.5pt;color:${GREEN_MED};">· ${esc(v.cuvee)}</span></div>
