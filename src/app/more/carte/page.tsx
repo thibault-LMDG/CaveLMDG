@@ -23,6 +23,8 @@ interface WineRow {
   millesime: string | null
   prix_vente: string
   commentaire_client: string | null
+  au_verre: boolean
+  prix_verre: number | null
   cave_domains: { nom: string } | null
 }
 
@@ -251,9 +253,17 @@ async function paginateChapitres(
 // ────────────────────────────────────────────
 // Full HTML document builder
 // ────────────────────────────────────────────
+interface AuVerreVin {
+  domaine: string
+  cuvee: string
+  type: string
+  prix: string
+}
+
 function buildFullHTML(
   css: string,
   contentPages: string[],
+  auVerreVins: AuVerreVin[],
   imgLogo: string,
   imgPaysage: string,
   imgPointu: string,
@@ -280,19 +290,56 @@ function buildFullHTML(
     <img src="${imgPointu}" style="position:absolute;bottom:4mm;left:50%;transform:translateX(-50%);width:64mm;opacity:0.9;">
   </div><div class="foot">LA MARINE DES GOUDES&nbsp;·&nbsp;MARSEILLE 8ᵉ · LES GOUDES</div></div>`
 
-  const families = ['BULLES', 'BLANCS', 'ROSÉS', 'ROUGES']
-  const auverreGrid = families.map(x =>
-    `<div style="text-align:center;border-top:0.6pt solid ${GREEN_RULE};border-bottom:0.6pt solid ${GREEN_RULE};padding:9mm 0;">
-      <div style="font-family:'Akz';font-size:21pt;color:${GREEN};">${x}</div>
-      <div style="font-family:'Cop';font-size:7pt;letter-spacing:2px;color:${GREEN_PALE};margin-top:3mm;">12 CL</div>
-      <div style="font-family:'Lum';font-size:12pt;color:${GREEN_PALE};margin-top:2mm;">—</div>
-    </div>`
-  ).join('')
+  // Section Au Verre — dynamique avec les vrais vins cochés au_verre
+  const TYPE_LABEL_VERRE: Record<string, string> = { BULLE: 'BULLES', BLANC: 'BLANCS', ROSÉ: 'ROSÉS', ROUGE: 'ROUGES', 'DEMI-SEC': 'DEMI-SEC' }
+  const TYPE_ORDER_VERRE = ['BULLE', 'BLANC', 'ROSÉ', 'ROUGE', 'DEMI-SEC']
+  
+  // Grouper les vins au verre par type
+  const verreByType: Record<string, AuVerreVin[]> = {}
+  for (const v of auVerreVins) {
+    if (!verreByType[v.type]) verreByType[v.type] = []
+    verreByType[v.type].push(v)
+  }
+
+  let auverreContent = ''
+  if (auVerreVins.length > 0) {
+    // Vins au verre listés par famille
+    const verreItems = TYPE_ORDER_VERRE
+      .filter(t => verreByType[t]?.length)
+      .map(t => {
+        const vins = verreByType[t]
+        const familyLabel = TYPE_LABEL_VERRE[t] || t
+        const vinsList = vins.map(v =>
+          `<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2.5mm;">
+            <div style="font-family:'CopB';font-size:9pt;color:${GREEN};">${esc(v.domaine)} <span style="font-family:'CopB';font-size:7.5pt;color:${GREEN_MED};">· ${esc(v.cuvee)}</span></div>
+            <div style="flex:1;min-width:3mm;"></div>
+            <div style="font-family:'Cop';font-size:9pt;color:${GREEN};">${esc(v.prix)}€</div>
+          </div>`
+        ).join('')
+        return `<div style="margin-bottom:6mm;">
+          <div style="font-family:'Lum';font-size:13pt;color:${GREEN};margin-bottom:3mm;">${familyLabel}</div>
+          ${vinsList}
+        </div>`
+      }).join('')
+    
+    auverreContent = `<div style="margin-top:10mm;">${verreItems}</div>`
+  } else {
+    // Pas de vin au verre → afficher la grille vide comme Charlotte
+    const families = ['BULLES', 'BLANCS', 'ROSÉS', 'ROUGES']
+    const auverreGrid = families.map(x =>
+      `<div style="text-align:center;border-top:0.6pt solid ${GREEN_RULE};border-bottom:0.6pt solid ${GREEN_RULE};padding:9mm 0;">
+        <div style="font-family:'Akz';font-size:21pt;color:${GREEN};">${x}</div>
+        <div style="font-family:'Cop';font-size:7pt;letter-spacing:2px;color:${GREEN_PALE};margin-top:3mm;">12 CL</div>
+        <div style="font-family:'Lum';font-size:12pt;color:${GREEN_PALE};margin-top:2mm;">—</div>
+      </div>`
+    ).join('')
+    auverreContent = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14mm 18mm;max-width:150mm;margin:0 auto;">${auverreGrid}</div>`
+  }
 
   const auverre = `<div class="page"><div class="pad">
-    <div class="chap-head"><div class="chap-top"><span class="chap-num">À L'ARDOISE</span><span class="chap-count">0 cuvée</span></div><div class="chap-title">AU VERRE</div><div class="chap-rule"></div></div>
-    <div style="text-align:center;font-family:'Lum';font-size:11.5pt;line-height:1.6;color:${GREEN_DESC};margin:14mm auto 16mm;max-width:130mm;">Notre sélection au verre évolue chaque semaine, au gré de la cave et des arrivages. Demandez à la salle — nous serons ravis de vous accompagner.</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14mm 18mm;max-width:150mm;margin:0 auto;">${auverreGrid}</div>
+    <div class="chap-head"><div class="chap-top"><span class="chap-num">À L'ARDOISE</span><span class="chap-count">${countLabel(auVerreVins.length)}</span></div><div class="chap-title">AU VERRE</div><div class="chap-rule"></div></div>
+    <div style="text-align:center;font-family:'Lum';font-size:11.5pt;line-height:1.6;color:${GREEN_DESC};margin:8mm auto 8mm;max-width:130mm;">Notre sélection au verre évolue chaque semaine, au gré de la cave et des arrivages. Demandez à la salle — nous serons ravis de vous accompagner.</div>
+    ${auverreContent}
     <img src="${imgPaysage}" style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:108mm;opacity:0.5;">
   </div><div class="foot">LA MARINE DES GOUDES&nbsp;·&nbsp;AU VERRE</div></div>`
 
@@ -418,7 +465,7 @@ export default function CartePage() {
     setLoading(true)
     const { data } = await supabase
       .from('cave_wines')
-      .select('type, region, cuvee, type_appellation, nom_appellation, cepage, millesime, prix_vente, commentaire_client, cave_domains(nom)')
+      .select('type, region, cuvee, type_appellation, nom_appellation, cepage, millesime, prix_vente, commentaire_client, au_verre, prix_verre, cave_domains(nom)')
       .neq('statut', 'archive')
       .gt('quantite_stock', 0)
 
@@ -483,7 +530,18 @@ export default function CartePage() {
     }
 
     const contentPages = await paginateChapitres(chapitres, measureFn, availPx)
-    const fullHTML = buildFullHTML(css, contentPages, assets.imgLogo, assets.imgPaysage, assets.imgPointu, assets.imgHomard)
+    
+    // Construire la liste des vins au verre
+    const auVerreVins: AuVerreVin[] = wines
+      .filter(w => w.au_verre && w.prix_verre)
+      .map(w => ({
+        domaine: w.cave_domains?.nom || '',
+        cuvee: w.cuvee || '',
+        type: w.type,
+        prix: String(Math.round(w.prix_verre!)),
+      }))
+    
+    const fullHTML = buildFullHTML(css, contentPages, auVerreVins, assets.imgLogo, assets.imgPaysage, assets.imgPointu, assets.imgHomard)
 
     setPreviewHTML(fullHTML)
     setTotalPages(contentPages.length + 4) // +4 = cover + mot maison + au verre + cloture

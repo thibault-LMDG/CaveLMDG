@@ -123,7 +123,7 @@ export default function WineDetailPage() {
           { label: 'PA HT', value: `${wine.prix_achat_ht}€` },
           { label: 'FDP', value: wine.frais_port > 0 ? `${wine.frais_port}€` : '—' },
           { label: 'BevCost', value: bevcost },
-          { label: 'Au verre', value: wine.au_verre ? `Oui (${wine.verres_par_bouteille}v)` : 'Non' },
+          { label: 'Au verre', value: wine.au_verre ? `${wine.prix_verre ? wine.prix_verre + '€' : '—'} (${wine.verres_par_bouteille}v)` : 'Non' },
         ].map((m) => (
           <div key={m.label} style={{ background: T.deep, borderRadius: 8, padding: '8px 12px', border: `0.5px solid ${T.border}` }}>
             <div style={{ fontSize: 10, color: T.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>{m.label}</div>
