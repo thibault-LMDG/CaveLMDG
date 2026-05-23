@@ -116,7 +116,7 @@ function QuizContent() {
       }
     } catch (err) {
       console.error('Quiz load error:', err)
-      alert('Erreur lors du chargement du quiz. Réessayez.')
+      alert(`Erreur: ${err instanceof Error ? err.message : 'Réessayez'}`)
       setView('levels')
     } finally {
       setLoading(false)

@@ -71,7 +71,7 @@ export default function CollectifPage() {
       setView('quiz')
     } catch (err) {
       console.error(err)
-      alert('Erreur lors du chargement. Réessayez.')
+      alert(`Erreur: ${err instanceof Error ? err.message : 'Réessayez'}`)
     } finally {
       setLoading(false)
     }

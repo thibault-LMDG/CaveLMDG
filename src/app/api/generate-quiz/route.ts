@@ -167,6 +167,7 @@ export async function POST(req: NextRequest) {
     if (!apiKey) {
       return NextResponse.json({ error: 'ANTHROPIC_API_KEY non configuree' }, { status: 500 })
     }
+    console.log('API key prefix:', apiKey.slice(0, 10), '... length:', apiKey.length)
 
     const levels = parcours === 'culture' ? CULTURE_LEVELS : CAVE_LEVELS
     const levelConfig = levels[level]
@@ -258,9 +259,9 @@ ${formatInstruction}`
         break
       } else {
         const errText = await response.text()
-        console.error(`Anthropic API error with ${model}:`, response.status, errText.slice(0, 200))
+        console.error(`Anthropic API error with ${model}: status=${response.status} body=${errText}`)
         if (model === models[models.length - 1]) {
-          return NextResponse.json({ error: `API Anthropic: ${response.status} — ${errText.slice(0, 100)}` }, { status: 500 })
+          return NextResponse.json({ error: `API Anthropic: status ${response.status} — ${errText.slice(0, 300)}` }, { status: 500 })
         }
         // Continue to next model
       }
