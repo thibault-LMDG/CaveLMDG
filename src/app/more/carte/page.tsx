@@ -309,6 +309,72 @@ function buildFullHTML(
 }
 
 // ────────────────────────────────────────────
+// Preview container with responsive scaling
+// ────────────────────────────────────────────
+function PreviewContainer({ iframeRef, totalPages }: { iframeRef: React.RefObject<HTMLIFrameElement | null>; totalPages: number }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [scale, setScale] = useState(0.35)
+
+  useEffect(() => {
+    const updateScale = () => {
+      if (containerRef.current) {
+        const containerW = containerRef.current.clientWidth - 16 // padding
+        const iframeW = 210 * 3.7795 // 210mm in px at 96dpi ≈ 793.7px
+        setScale(Math.min(containerW / iframeW, 0.6))
+      }
+    }
+    updateScale()
+    window.addEventListener('resize', updateScale)
+    return () => window.removeEventListener('resize', updateScale)
+  }, [])
+
+  const iframeWPx = 210 * 3.7795 // mm to px
+  const iframeHPx = 297 * totalPages * 3.7795
+  const scaledW = iframeWPx * scale
+  const scaledH = iframeHPx * scale
+
+  return (
+    <div
+      ref={containerRef}
+      style={{
+        background: '#1a1a2e',
+        borderRadius: 12,
+        padding: '16px 8px',
+        overflow: 'hidden',
+      }}
+    >
+      <div style={{
+        width: '100%',
+        maxHeight: '65vh',
+        overflow: 'auto',
+        borderRadius: 8,
+        WebkitOverflowScrolling: 'touch',
+        display: 'flex',
+        justifyContent: 'center',
+      }}>
+        <div style={{ width: scaledW, height: scaledH, flexShrink: 0 }}>
+          <iframe
+            ref={iframeRef}
+            title="Carte des vins preview"
+            style={{
+              width: iframeWPx,
+              height: iframeHPx,
+              border: 'none',
+              background: '#fff',
+              transform: `scale(${scale})`,
+              transformOrigin: 'top left',
+            }}
+          />
+        </div>
+      </div>
+      <div style={{ textAlign: 'center', fontSize: 11, color: T.muted, marginTop: 8 }}>
+        Aperçu de la carte — faites défiler pour voir toutes les pages
+      </div>
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────
 // Main Page Component
 // ────────────────────────────────────────────
 export default function CartePage() {
@@ -535,37 +601,7 @@ export default function CartePage() {
 
       {/* Preview iframe */}
       {isReady && (
-        <div style={{
-          background: '#1a1a2e',
-          borderRadius: 12,
-          padding: '16px 8px',
-          overflow: 'hidden',
-        }}>
-          <div style={{
-            width: '100%',
-            aspectRatio: '210 / ' + String(297 * totalPages + 20 * (totalPages - 1)),
-            maxHeight: '70vh',
-            overflow: 'auto',
-            borderRadius: 8,
-            WebkitOverflowScrolling: 'touch',
-          }}>
-            <iframe
-              ref={iframeRef}
-              title="Carte des vins preview"
-              style={{
-                width: '210mm',
-                height: `${297 * totalPages}mm`,
-                border: 'none',
-                background: '#fff',
-                transform: 'scale(0.38)',
-                transformOrigin: 'top left',
-              }}
-            />
-          </div>
-          <div style={{ textAlign: 'center', fontSize: 11, color: T.muted, marginTop: 8 }}>
-            Aperçu de la carte — faites défiler pour voir toutes les pages
-          </div>
-        </div>
+        <PreviewContainer iframeRef={iframeRef} totalPages={totalPages} />
       )}
     </div>
   )
