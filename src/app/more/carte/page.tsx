@@ -74,6 +74,10 @@ function buildChapitres(wines: WineRow[]): ChapitreData[] {
         appParts.push(`${w.type_appellation} ${w.nom_appellation}`)
       } else if (w.nom_appellation) {
         appParts.push(w.nom_appellation)
+      } else if (w.type_appellation) {
+        // VDF sans nom → afficher "VIN DE FRANCE"
+        const typeLabels: Record<string, string> = { VDF: 'VIN DE FRANCE', IGP: 'IGP', AOP: 'AOP' }
+        appParts.push(typeLabels[w.type_appellation] || w.type_appellation)
       }
 
       byRegion[region].push({
