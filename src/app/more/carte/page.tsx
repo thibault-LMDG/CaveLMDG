@@ -42,7 +42,8 @@ export default function CartePage() {
       .gt('quantite_stock', 0)
 
     if (data) {
-      const formatted: CarteWine[] = (data as (CarteWine & { cave_domains?: { nom: string } })[]).map((w) => ({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const formatted: CarteWine[] = (data as any[]).map((w) => ({
         ...w,
         domaine: w.cave_domains?.nom || null,
       }))
