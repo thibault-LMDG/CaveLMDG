@@ -169,7 +169,7 @@ export default function CollectifPage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', borderTop: `0.5px solid rgba(30,58,95,0.4)` }}>
           <span style={{ fontSize: 14, color: T.text2 }}>Questions</span>
           <div style={{ display: 'flex', gap: 6 }}>
-            {[5, 10].map(n => (
+            {[3, 5, 10].map(n => (
               <button
                 key={n}
                 onClick={() => setCount(n)}

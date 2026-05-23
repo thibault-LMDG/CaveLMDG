@@ -234,28 +234,43 @@ ${wineDataContext}
 
 ${formatInstruction}`
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 4000,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    })
+    // Essayer d'abord le modèle standard, puis fallback
+    const models = ['claude-sonnet-4-20250514', 'claude-3-5-sonnet-20241022']
+    let responseData = null
 
-    if (!response.ok) {
-      const errText = await response.text()
-      console.error('Anthropic API error:', response.status, errText)
-      return NextResponse.json({ error: `API Anthropic: ${response.status}` }, { status: 500 })
+    for (const model of models) {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 4000,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      })
+
+      if (response.ok) {
+        responseData = await response.json()
+        break
+      } else {
+        const errText = await response.text()
+        console.error(`Anthropic API error with ${model}:`, response.status, errText.slice(0, 200))
+        if (model === models[models.length - 1]) {
+          return NextResponse.json({ error: `API Anthropic: ${response.status} — ${errText.slice(0, 100)}` }, { status: 500 })
+        }
+        // Continue to next model
+      }
     }
 
-    const data = await response.json()
-    const text = data.content?.[0]?.text || '{}'
+    if (!responseData) {
+      return NextResponse.json({ error: 'Tous les modèles ont échoué' }, { status: 500 })
+    }
+
+    const text = responseData.content?.[0]?.text || '{}'
     const clean = text.replace(/```json|```/g, '').trim()
     const parsed = JSON.parse(clean)
 
