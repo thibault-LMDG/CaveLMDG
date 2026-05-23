@@ -5,6 +5,7 @@ import { T } from '@/lib/theme'
 
 const menuItems = [
   { href: '/more/agents', emoji: '📞', label: 'Fournisseurs & Agents', desc: 'Annuaire, conditions franco' },
+  { href: '/more/domains', emoji: '🏠', label: 'Domaines', desc: 'Histoire, terroir et vins par domaine' },
   { href: '/more/pricing', emoji: '💰', label: 'Grille de pricing', desc: 'Coefficients et BevCost' },
   { href: '/more/carte', emoji: '🖨️', label: 'Carte des vins', desc: 'Aperçu en stock + PDF imprimable' },
   { href: '#', emoji: '⚠️', label: 'Alertes', desc: 'Stock bas, dormant, ruptures', disabled: true },
