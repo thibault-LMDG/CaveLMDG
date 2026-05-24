@@ -8,7 +8,7 @@ const supabase = createClient(
 
 export async function GET() {
   try {
-    // 1. Get IDs already synced (stored as "tiller:<ligne_id>" in commentaire)
+    // 1. Get IDs already synced
     const { data: existingMovements } = await supabase
       .from('cave_stock_movements')
       .select('commentaire')
@@ -18,51 +18,117 @@ export async function GET() {
       (existingMovements || []).map((m: { commentaire: string }) => m.commentaire.replace('tiller:', ''))
     )
 
-    // 2. Get matched sales via the view (joins lignes_produits + cave_tiller_mapping)
-    const { data: sales, error: salesErr } = await supabase
-      .from('v_cave_tiller_sales')
-      .select('ligne_id, produit, quantite, wine_id, is_au_verre, created_at')
+    // 2. Get all mappings (bouteille + verre)
+    const { data: mappingsData } = await supabase
+      .from('cave_tiller_mapping')
+      .select('wine_id, tiller_product_name, tiller_verre_product_name, is_au_verre')
+
+    if (!mappingsData || mappingsData.length === 0) {
+      return NextResponse.json({ message: 'Aucun mapping configuré', synced: 0 })
+    }
+
+    // Build lookup: tiller_product_name -> { wine_id, type: 'btl' | 'verre' }
+    const productLookup = new Map<string, { wine_id: string; sale_type: 'btl' | 'verre' }>()
+    for (const m of mappingsData) {
+      if (m.tiller_product_name && m.wine_id) {
+        productLookup.set(m.tiller_product_name, { wine_id: m.wine_id, sale_type: 'btl' })
+      }
+      if (m.tiller_verre_product_name && m.wine_id) {
+        productLookup.set(m.tiller_verre_product_name, { wine_id: m.wine_id, sale_type: 'verre' })
+      }
+    }
+
+    // 3. Get verres_par_bouteille for verre conversion
+    const { data: winesData } = await supabase
+      .from('cave_wines')
+      .select('id, verres_par_bouteille')
+      .neq('statut', 'archive')
+    const verresMap = new Map<string, number>()
+    for (const w of (winesData || [])) {
+      verresMap.set(w.id, w.verres_par_bouteille || 6)
+    }
+
+    // 4. Get recent sales from lignes_produits (last 7 days to cover any gaps)
+    const sevenDaysAgo = new Date()
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+    const { data: salesData, error: salesErr } = await supabase
+      .from('lignes_produits')
+      .select('id, produit, quantite, created_at')
+      .gte('created_at', sevenDaysAgo.toISOString())
       .order('created_at', { ascending: true })
     if (salesErr) throw salesErr
 
-    // 3. Filter out already-synced
-    const newSales = (sales || []).filter((s: { ligne_id: string }) => !syncedIds.has(s.ligne_id))
+    // 5. Match and filter
+    const newSales: Array<{
+      ligne_id: string
+      produit: string
+      wine_id: string
+      quantite: number
+      sale_type: 'btl' | 'verre'
+    }> = []
 
-    if (newSales.length === 0) {
-      return NextResponse.json({ 
-        message: 'Aucune nouvelle vente', 
-        synced: 0, 
-        total_matched: (sales || []).length,
-        already_synced: syncedIds.size
+    for (const sale of (salesData || [])) {
+      if (syncedIds.has(sale.id)) continue
+      const match = productLookup.get(sale.produit)
+      if (!match) continue
+      newSales.push({
+        ligne_id: sale.id,
+        produit: sale.produit,
+        wine_id: match.wine_id,
+        quantite: sale.quantite || 1,
+        sale_type: match.sale_type,
       })
     }
 
-    // 4. Create stock movements
-    let synced = 0
+    if (newSales.length === 0) {
+      return NextResponse.json({
+        message: 'Aucune nouvelle vente',
+        synced: 0,
+        total_products_tracked: productLookup.size,
+        already_synced: syncedIds.size,
+      })
+    }
+
+    // 6. Create stock movements
+    let syncedBtl = 0, syncedVerre = 0
     const errors: string[] = []
 
     for (const sale of newSales) {
-      const quantite = sale.quantite || 1
+      let stockDecrement: number
+
+      if (sale.sale_type === 'verre') {
+        // Convert verres to fraction of bottle
+        const verresParBtl = verresMap.get(sale.wine_id) || 6
+        stockDecrement = sale.quantite / verresParBtl
+      } else {
+        stockDecrement = sale.quantite
+      }
+
       const { error: insertErr } = await supabase
         .from('cave_stock_movements')
         .insert({
           wine_id: sale.wine_id,
           type: 'vente',
-          quantite: -quantite,
+          quantite: -stockDecrement,
           commentaire: `tiller:${sale.ligne_id}`,
+          motif: sale.sale_type === 'verre' ? `Verre: ${sale.produit}` : sale.produit,
         })
+
       if (insertErr) {
         errors.push(`${sale.produit}: ${insertErr.message}`)
       } else {
-        synced++
+        if (sale.sale_type === 'verre') syncedVerre++
+        else syncedBtl++
       }
     }
 
     return NextResponse.json({
-      message: `${synced} vente(s) synchronisee(s)`,
-      synced,
+      message: `${syncedBtl + syncedVerre} vente(s) synchronisée(s)`,
+      synced_btl: syncedBtl,
+      synced_verre: syncedVerre,
+      synced_total: syncedBtl + syncedVerre,
       new_sales: newSales.length,
-      total_matched: (sales || []).length,
+      total_products_tracked: productLookup.size,
       already_synced: syncedIds.size,
       errors: errors.length > 0 ? errors : undefined,
     })
