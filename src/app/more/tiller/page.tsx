@@ -21,6 +21,8 @@ interface Mapping {
   id: string
   tiller_product_name: string
   tiller_product_id: number | null
+  tiller_verre_product_name: string | null
+  tiller_verre_product_id: number | null
   wine_id: string | null
   is_au_verre: boolean
 }
@@ -28,22 +30,13 @@ interface Mapping {
 type WineWithDomain = Wine & { cave_domains?: { nom: string } }
 
 // === Auto-matching logic ===
-// Tiller names follow: "Domaine Cuvee - Type" (Blc/Rge/Rose/Bulle/Doux/Champ)
-// We score based on matching words from domaine + cuvée
 function normalizeStr(s: string): string {
-  return (s || '')
-    .toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[''`]/g, ' ')
-    .replace(/[^a-z0-9\s]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
+  return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[''`]/g, ' ').replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim()
 }
 
 function getTypeAbbrev(wineType: string): string {
-  const map: Record<string, string> = {
-    'BLANC': 'blc', 'ROUGE': 'rge', 'ROSÉ': 'rose', 'BULLE': 'bulle', 'DEMI-SEC': 'doux'
-  }
+  const map: Record<string, string> = { 'BLANC': 'blc', 'ROUGE': 'rge', 'ROSÉ': 'rose', 'BULLE': 'bulle', 'DEMI-SEC': 'doux' }
   return map[wineType] || ''
 }
 
@@ -52,53 +45,52 @@ const WINE_CATEGORIES = new Set([
   'Champagnes', 'Bulles New', 'Vin Verre'
 ])
 
+const BTL_CATEGORIES = new Set([
+  'Blancs New', 'Blancs', 'Rouges', 'Rouges New', 'Rose', 'Rose New',
+  'Champagnes', 'Bulles New'
+])
+
 function scoreTillerMatch(wine: WineWithDomain, tillerProduct: CatalogProduct): number {
   const domaine = normalizeStr(wine.cave_domains?.nom || '')
   const cuvee = normalizeStr(wine.cuvee || '')
   const tillerName = normalizeStr(tillerProduct.name)
   const wineTypeAbbr = getTypeAbbrev(wine.type)
-
   let score = 0
-
-  // Type check (blc/rge/rose/bulle) — must match for non-verre products
   if (wineTypeAbbr && tillerName.includes(wineTypeAbbr)) score += 10
   else if (wineTypeAbbr && !tillerName.endsWith('champ')) score -= 20
-
-  // Price match — boost if same price (strong signal)
   const priceDiff = Math.abs(wine.prix_vente - tillerProduct.price)
   if (priceDiff === 0) score += 15
   else if (priceDiff <= 2) score += 8
   else if (priceDiff <= 5) score += 3
-
-  // Domaine words matching
   const domaineWords = domaine.split(' ').filter(w => w.length > 2)
-  for (const word of domaineWords) {
-    if (tillerName.includes(word)) score += 5
-  }
-
-  // Cuvée words matching
+  for (const word of domaineWords) { if (tillerName.includes(word)) score += 5 }
   const cuveeWords = cuvee.split(' ').filter(w => w.length > 2)
-  for (const word of cuveeWords) {
-    if (tillerName.includes(word)) score += 4
-  }
-
+  for (const word of cuveeWords) { if (tillerName.includes(word)) score += 4 }
   return score
 }
 
-function findBestMatch(wine: WineWithDomain, catalog: CatalogProduct[]): { product: CatalogProduct; score: number } | null {
-  // Only consider wine categories
-  const wineCatalog = catalog.filter(p => WINE_CATEGORIES.has(p.category_name) && p.is_active)
-  if (wineCatalog.length === 0) return null
-
-  let best: CatalogProduct | null = null
-  let bestScore = 0
-
-  for (const p of wineCatalog) {
-    const s = scoreTillerMatch(wine, p)
-    if (s > bestScore) { bestScore = s; best = p }
-  }
-
+function findBestMatch(wine: WineWithDomain, catalog: CatalogProduct[], categories: Set<string>): { product: CatalogProduct; score: number } | null {
+  const filtered = catalog.filter(p => categories.has(p.category_name) && p.is_active)
+  let best: CatalogProduct | null = null, bestScore = 0
+  for (const p of filtered) { const s = scoreTillerMatch(wine, p); if (s > bestScore) { bestScore = s; best = p } }
   return best && bestScore >= 15 ? { product: best, score: bestScore } : null
+}
+
+function findVerreMatch(wine: WineWithDomain, catalog: CatalogProduct[]): CatalogProduct | null {
+  const verreProducts = catalog.filter(p => p.category_name === 'Vin Verre' && p.is_active)
+  const tillerName = normalizeStr(wine.cave_domains?.nom || '')
+  const typeAbbr = getTypeAbbrev(wine.type)
+  let best: CatalogProduct | null = null, bestScore = 0
+  for (const p of verreProducts) {
+    const pName = normalizeStr(p.name)
+    let score = 0
+    const domaineWords = tillerName.split(' ').filter(w => w.length > 2)
+    for (const word of domaineWords) { if (pName.includes(word)) score += 5 }
+    if (typeAbbr && pName.includes(typeAbbr)) score += 10
+    if (wine.prix_verre && Math.abs(wine.prix_verre - p.price) <= 1) score += 15
+    if (score > bestScore) { bestScore = score; best = p }
+  }
+  return best && bestScore >= 10 ? best : null
 }
 
 export default function TillerMappingPage() {
@@ -110,6 +102,7 @@ export default function TillerMappingPage() {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | 'mapped' | 'unmapped'>('all')
   const [editingWine, setEditingWine] = useState<string | null>(null)
+  const [editingField, setEditingField] = useState<'btl' | 'verre'>('btl')
   const [tillerSearch, setTillerSearch] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -127,22 +120,17 @@ export default function TillerMappingPage() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  // Index mappings by wine_id
   const mappingByWine = useMemo(() => {
     const map: Record<string, Mapping> = {}
     for (const m of mappings) { if (m.wine_id) map[m.wine_id] = m }
     return map
   }, [mappings])
 
-  // Index catalog by tiller_product_id
   const catalogById = useMemo(() => {
     const map: Record<number, CatalogProduct> = {}
     for (const p of catalog) map[p.tiller_product_id] = p
     return map
   }, [catalog])
-
-  // Already mapped tiller IDs (to show which are taken)
-  const mappedTillerIds = useMemo(() => new Set(mappings.map(m => m.tiller_product_id).filter(Boolean)), [mappings])
 
   const mapped = wines.filter(w => mappingByWine[w.id])
   const unmapped = wines.filter(w => !mappingByWine[w.id])
@@ -159,37 +147,37 @@ export default function TillerMappingPage() {
     return true
   })
 
-  // Filtered catalog for selection panel
   const filteredCatalog = useMemo(() => {
-    const wineCat = catalog.filter(p => WINE_CATEGORIES.has(p.category_name) && p.is_active)
+    const cats = editingField === 'verre' ? new Set(['Vin Verre']) : BTL_CATEGORIES
+    const wineCat = catalog.filter(p => cats.has(p.category_name) && p.is_active)
     if (!tillerSearch) return wineCat
     const q = tillerSearch.toLowerCase()
     return wineCat.filter(p => p.name.toLowerCase().includes(q))
-  }, [catalog, tillerSearch])
+  }, [catalog, tillerSearch, editingField])
 
-  async function mapWineToProduct(wineId: string, product: CatalogProduct, isAuVerre: boolean) {
+  async function mapProduct(wineId: string, product: CatalogProduct, field: 'btl' | 'verre') {
     setSaving(true)
     const existing = mappingByWine[wineId]
+    const updates = field === 'verre'
+      ? { tiller_verre_product_name: product.name, tiller_verre_product_id: product.tiller_product_id }
+      : { tiller_product_name: product.name, tiller_product_id: product.tiller_product_id, wine_id: wineId, is_au_verre: false }
     if (existing) {
-      await supabase.from('cave_tiller_mapping')
-        .update({ tiller_product_name: product.name, tiller_product_id: product.tiller_product_id, wine_id: wineId, is_au_verre: isAuVerre })
-        .eq('id', existing.id)
+      await supabase.from('cave_tiller_mapping').update(updates).eq('id', existing.id)
     } else {
-      await supabase.from('cave_tiller_mapping')
-        .insert({ tiller_product_name: product.name, tiller_product_id: product.tiller_product_id, wine_id: wineId, is_au_verre: isAuVerre })
+      await supabase.from('cave_tiller_mapping').insert({ ...updates, wine_id: wineId, tiller_product_name: product.name, tiller_product_id: product.tiller_product_id })
     }
-    setEditingWine(null)
-    setTillerSearch('')
-    setSaving(false)
-    loadData()
+    setEditingWine(null); setTillerSearch(''); setSaving(false); loadData()
   }
 
-  async function unmapWine(wineId: string) {
+  async function unmapField(wineId: string, field: 'btl' | 'verre') {
     const existing = mappingByWine[wineId]
-    if (existing) {
+    if (!existing) return
+    if (field === 'verre') {
+      await supabase.from('cave_tiller_mapping').update({ tiller_verre_product_name: null, tiller_verre_product_id: null }).eq('id', existing.id)
+    } else {
       await supabase.from('cave_tiller_mapping').delete().eq('id', existing.id)
-      loadData()
     }
+    loadData()
   }
 
   const typeEmoji: Record<string, string> = { BLANC: '⚪', ROUGE: '🔴', ROSÉ: '🩷', BULLE: '🫧', 'DEMI-SEC': '🍯' }
@@ -197,47 +185,34 @@ export default function TillerMappingPage() {
   return (
     <div style={{ padding: '16px 16px 80px', minHeight: '100vh', background: T.sea }}>
       <button onClick={() => router.back()} style={{ background: 'none', border: 'none', color: T.teal, fontSize: 14, cursor: 'pointer', padding: 0, marginBottom: 12 }}>← Retour</button>
-
       <div style={{ fontSize: 24, fontWeight: 500, color: T.text, marginBottom: 4 }}>Mapping Tiller</div>
       <div style={{ fontSize: 12, color: T.muted, marginBottom: 16 }}>Associer les vins de la cave aux produits de la caisse</div>
 
       {/* KPIs */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        <div style={{ flex: 1, background: T.deep, borderRadius: 10, padding: '10px 12px', border: `0.5px solid ${T.border}` }}>
-          <div style={{ fontSize: 10, color: T.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Vins cave</div>
-          <div style={{ fontSize: 18, fontWeight: 500, color: T.gold, marginTop: 2 }}>{wines.length}</div>
-        </div>
-        <div style={{ flex: 1, background: T.deep, borderRadius: 10, padding: '10px 12px', border: `0.5px solid ${T.border}` }}>
-          <div style={{ fontSize: 10, color: T.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Mappés</div>
-          <div style={{ fontSize: 18, fontWeight: 500, color: T.up, marginTop: 2 }}>{mapped.length}</div>
-        </div>
-        <div style={{ flex: 1, background: T.deep, borderRadius: 10, padding: '10px 12px', border: `0.5px solid ${T.border}` }}>
-          <div style={{ fontSize: 10, color: T.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Non liés</div>
-          <div style={{ fontSize: 18, fontWeight: 500, color: unmapped.length > 0 ? T.down : T.up, marginTop: 2 }}>{unmapped.length}</div>
-        </div>
-        <div style={{ flex: 1, background: T.deep, borderRadius: 10, padding: '10px 12px', border: `0.5px solid ${T.border}` }}>
-          <div style={{ fontSize: 10, color: T.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Produits Tiller</div>
-          <div style={{ fontSize: 18, fontWeight: 500, color: T.teal, marginTop: 2 }}>{catalog.filter(p => WINE_CATEGORIES.has(p.category_name)).length}</div>
-        </div>
+        {[
+          { label: 'Vins cave', value: wines.length, color: T.gold },
+          { label: 'Mappés', value: mapped.length, color: T.up },
+          { label: 'Non liés', value: unmapped.length, color: unmapped.length > 0 ? T.down : T.up },
+          { label: 'Produits', value: catalog.filter(p => WINE_CATEGORIES.has(p.category_name)).length, color: T.teal },
+        ].map((kpi) => (
+          <div key={kpi.label} style={{ flex: 1, background: T.deep, borderRadius: 10, padding: '10px 12px', border: `0.5px solid ${T.border}` }}>
+            <div style={{ fontSize: 10, color: T.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>{kpi.label}</div>
+            <div style={{ fontSize: 18, fontWeight: 500, color: kpi.color, marginTop: 2 }}>{kpi.value}</div>
+          </div>
+        ))}
       </div>
 
       <SearchBar value={search} onChange={setSearch} placeholder="Chercher un vin de la cave…" />
 
-      {/* Filters */}
       <div style={{ display: 'flex', gap: 6, marginTop: 12, marginBottom: 14 }}>
         {([['all', 'Tous'], ['unmapped', 'Non liés'], ['mapped', 'Mappés']] as [string, string][]).map(([key, label]) => (
-          <button
-            key={key}
-            onClick={() => setFilter(key as typeof filter)}
-            style={{
-              padding: '5px 12px', borderRadius: 16, fontSize: 12,
-              border: `0.5px solid ${filter === key ? T.gold + '60' : T.border}`,
-              background: filter === key ? T.gold + '18' : 'transparent',
-              color: filter === key ? T.gold : T.text2, cursor: 'pointer',
-            }}
-          >
-            {label}
-          </button>
+          <button key={key} onClick={() => setFilter(key as typeof filter)} style={{
+            padding: '5px 12px', borderRadius: 16, fontSize: 12,
+            border: `0.5px solid ${filter === key ? T.gold + '60' : T.border}`,
+            background: filter === key ? T.gold + '18' : 'transparent',
+            color: filter === key ? T.gold : T.text2, cursor: 'pointer',
+          }}>{label}</button>
         ))}
       </div>
 
@@ -247,9 +222,11 @@ export default function TillerMappingPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {filtered.map((wine) => {
             const mapping = mappingByWine[wine.id]
-            const linkedProduct = mapping?.tiller_product_id ? catalogById[mapping.tiller_product_id] : null
+            const btlProduct = mapping?.tiller_product_id ? catalogById[mapping.tiller_product_id] : null
+            const verreProduct = mapping?.tiller_verre_product_id ? catalogById[mapping.tiller_verre_product_id] : null
             const isEditing = editingWine === wine.id
-            const suggestion = !mapping ? findBestMatch(wine, catalog) : null
+            const suggestion = !mapping ? findBestMatch(wine, catalog, BTL_CATEGORIES) : null
+            const verreSuggestion = wine.au_verre && mapping && !mapping.tiller_verre_product_id ? findVerreMatch(wine, catalog) : null
 
             return (
               <div key={wine.id} style={{
@@ -258,13 +235,10 @@ export default function TillerMappingPage() {
                 overflow: 'hidden',
               }}>
                 {/* Wine header */}
-                <div
-                  style={{ padding: '12px 14px', cursor: 'pointer' }}
-                  onClick={() => {
-                    if (isEditing) { setEditingWine(null); setTillerSearch('') }
-                    else { setEditingWine(wine.id); setTillerSearch('') }
-                  }}
-                >
+                <div style={{ padding: '12px 14px', cursor: 'pointer' }} onClick={() => {
+                  if (isEditing) { setEditingWine(null); setTillerSearch('') }
+                  else { setEditingWine(wine.id); setEditingField('btl'); setTillerSearch('') }
+                }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 14, fontWeight: 500, color: T.text, display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -273,6 +247,7 @@ export default function TillerMappingPage() {
                       </div>
                       <div style={{ fontSize: 12, color: T.text2, marginTop: 2 }}>
                         {wine.cuvee || wine.nom_appellation} · {wine.prix_vente}€
+                        {wine.au_verre && <span style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 6, background: T.purple + '18', color: T.purple, fontSize: 10 }}>🥂 verre</span>}
                       </div>
                     </div>
                     <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 8 }}>
@@ -280,9 +255,13 @@ export default function TillerMappingPage() {
                         <>
                           <div style={{ fontSize: 11, color: T.up, fontWeight: 500 }}>✓ Mappé</div>
                           <div style={{ fontSize: 10, color: T.muted, marginTop: 1, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {mapping.tiller_product_name}
-                            {mapping.is_au_verre ? ' 🥂' : ''}
+                            🍾 {mapping.tiller_product_name}
                           </div>
+                          {wine.au_verre && (
+                            <div style={{ fontSize: 10, marginTop: 1, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: mapping.tiller_verre_product_name ? T.up : T.gold }}>
+                              {mapping.tiller_verre_product_name ? `🥂 ${mapping.tiller_verre_product_name}` : '🥂 verre non lié'}
+                            </div>
+                          )}
                         </>
                       ) : suggestion ? (
                         <div style={{ fontSize: 11, color: T.gold }}>💡 Suggestion</div>
@@ -292,31 +271,27 @@ export default function TillerMappingPage() {
                     </div>
                   </div>
 
-                  {/* Auto-suggestion preview (non-editing) */}
+                  {/* Auto-suggestion preview (bouteille) */}
                   {!isEditing && !mapping && suggestion && (
-                    <div style={{
-                      marginTop: 8, padding: '8px 10px', borderRadius: 8,
-                      background: T.gold + '0a', border: `0.5px solid ${T.gold}25`,
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    }}>
+                    <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: T.gold + '0a', border: `0.5px solid ${T.gold}25`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
-                        <div style={{ fontSize: 12, color: T.gold, fontWeight: 500 }}>{suggestion.product.name}</div>
+                        <div style={{ fontSize: 12, color: T.gold, fontWeight: 500 }}>🍾 {suggestion.product.name}</div>
                         <div style={{ fontSize: 10, color: T.muted }}>{suggestion.product.category_name} · {suggestion.product.price}€</div>
                       </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          mapWineToProduct(wine.id, suggestion.product, wine.au_verre)
-                        }}
-                        disabled={saving}
-                        style={{
-                          padding: '4px 12px', borderRadius: 8, fontSize: 11, fontWeight: 500,
-                          background: T.gold + '20', border: `0.5px solid ${T.gold}40`,
-                          color: T.gold, cursor: 'pointer',
-                        }}
-                      >
-                        Lier
-                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); mapProduct(wine.id, suggestion.product, 'btl') }} disabled={saving}
+                        style={{ padding: '4px 12px', borderRadius: 8, fontSize: 11, fontWeight: 500, background: T.gold + '20', border: `0.5px solid ${T.gold}40`, color: T.gold, cursor: 'pointer' }}>Lier</button>
+                    </div>
+                  )}
+
+                  {/* Auto-suggestion verre */}
+                  {!isEditing && verreSuggestion && (
+                    <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: T.purple + '0a', border: `0.5px solid ${T.purple}25`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontSize: 12, color: T.purple, fontWeight: 500 }}>🥂 {verreSuggestion.name}</div>
+                        <div style={{ fontSize: 10, color: T.muted }}>Vin Verre · {verreSuggestion.price}€</div>
+                      </div>
+                      <button onClick={(e) => { e.stopPropagation(); mapProduct(wine.id, verreSuggestion, 'verre') }} disabled={saving}
+                        style={{ padding: '4px 12px', borderRadius: 8, fontSize: 11, fontWeight: 500, background: T.purple + '20', border: `0.5px solid ${T.purple}40`, color: T.purple, cursor: 'pointer' }}>Lier verre</button>
                     </div>
                   )}
                 </div>
@@ -324,103 +299,69 @@ export default function TillerMappingPage() {
                 {/* Editing panel */}
                 {isEditing && (
                   <div style={{ padding: '0 14px 14px', borderTop: `0.5px solid ${T.border}20` }}>
+                    {/* Tab btl / verre */}
+                    {wine.au_verre && (
+                      <div style={{ display: 'flex', gap: 0, marginTop: 10, marginBottom: 8 }}>
+                        {(['btl', 'verre'] as const).map((f) => (
+                          <button key={f} onClick={() => { setEditingField(f); setTillerSearch('') }} style={{
+                            flex: 1, padding: '7px 0', fontSize: 12, fontWeight: 500, cursor: 'pointer', border: 'none',
+                            background: editingField === f ? (f === 'btl' ? T.gold + '18' : T.purple + '18') : 'transparent',
+                            color: editingField === f ? (f === 'btl' ? T.gold : T.purple) : T.muted,
+                            borderBottom: `2px solid ${editingField === f ? (f === 'btl' ? T.gold : T.purple) : 'transparent'}`,
+                          }}>
+                            {f === 'btl' ? '🍾 Bouteille' : '🥂 Verre'}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
                     {/* Current mapping info */}
-                    {mapping && linkedProduct && (
-                      <div style={{
-                        marginTop: 10, padding: '8px 10px', borderRadius: 8,
-                        background: T.up + '0a', border: `0.5px solid ${T.up}25`,
-                      }}>
-                        <div style={{ fontSize: 11, color: T.muted, marginBottom: 2 }}>Produit Tiller actuel :</div>
-                        <div style={{ fontSize: 13, color: T.up, fontWeight: 500 }}>{linkedProduct.name}</div>
-                        <div style={{ fontSize: 10, color: T.text2 }}>
-                          {linkedProduct.category_name} · {linkedProduct.price}€ · ID {linkedProduct.tiller_product_id}
-                          {mapping.is_au_verre ? ' · 🥂 au verre' : ' · 🍾 bouteille'}
-                        </div>
+                    {editingField === 'btl' && btlProduct && (
+                      <div style={{ padding: '8px 10px', borderRadius: 8, background: T.up + '0a', border: `0.5px solid ${T.up}25`, marginBottom: 8 }}>
+                        <div style={{ fontSize: 11, color: T.muted, marginBottom: 2 }}>Produit bouteille :</div>
+                        <div style={{ fontSize: 13, color: T.up, fontWeight: 500 }}>{btlProduct.name}</div>
+                        <div style={{ fontSize: 10, color: T.text2 }}>{btlProduct.category_name} · {btlProduct.price}€ · ID {btlProduct.tiller_product_id}</div>
+                      </div>
+                    )}
+                    {editingField === 'verre' && verreProduct && (
+                      <div style={{ padding: '8px 10px', borderRadius: 8, background: T.purple + '0a', border: `0.5px solid ${T.purple}25`, marginBottom: 8 }}>
+                        <div style={{ fontSize: 11, color: T.muted, marginBottom: 2 }}>Produit verre :</div>
+                        <div style={{ fontSize: 13, color: T.purple, fontWeight: 500 }}>{verreProduct.name}</div>
+                        <div style={{ fontSize: 10, color: T.text2 }}>Vin Verre · {verreProduct.price}€ · ID {verreProduct.tiller_product_id}</div>
                       </div>
                     )}
 
-                    {/* Search Tiller products */}
-                    <input
-                      type="text"
-                      value={tillerSearch}
-                      onChange={(e) => setTillerSearch(e.target.value)}
-                      placeholder="Chercher un produit Tiller…"
-                      autoFocus
-                      style={{
-                        width: '100%', padding: '8px 12px', borderRadius: 8,
-                        border: `0.5px solid ${T.border}`, background: T.sea,
-                        color: T.text, fontSize: 13, outline: 'none', marginTop: 10, marginBottom: 6,
-                        boxSizing: 'border-box',
-                      }}
-                    />
+                    <input type="text" value={tillerSearch} onChange={(e) => setTillerSearch(e.target.value)}
+                      placeholder={editingField === 'verre' ? 'Chercher un produit verre…' : 'Chercher un produit Tiller…'}
+                      autoFocus style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: `0.5px solid ${T.border}`, background: T.sea, color: T.text, fontSize: 13, outline: 'none', marginBottom: 6, boxSizing: 'border-box' }} />
 
-                    {/* Suggestion banner at top of list */}
-                    {!tillerSearch && !mapping && suggestion && (
-                      <div style={{
-                        padding: '8px 10px', marginBottom: 4, borderRadius: 8,
-                        background: T.gold + '10', border: `0.5px solid ${T.gold}30`,
-                      }}>
-                        <div style={{ fontSize: 10, color: T.gold, marginBottom: 4, fontWeight: 500 }}>💡 Meilleure correspondance :</div>
-                        <button
-                          onClick={() => mapWineToProduct(wine.id, suggestion.product, wine.au_verre)}
-                          disabled={saving}
-                          style={{
-                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                            width: '100%', padding: '6px 8px', background: 'transparent',
-                            border: 'none', color: T.text, fontSize: 12, cursor: 'pointer', textAlign: 'left',
-                          }}
-                        >
-                          <div>
-                            <div style={{ fontWeight: 500 }}>{suggestion.product.name}</div>
-                            <div style={{ fontSize: 11, color: T.text2 }}>{suggestion.product.category_name} · {suggestion.product.price}€</div>
-                          </div>
-                          <span style={{ color: T.gold, fontSize: 11, fontWeight: 500 }}>Lier →</span>
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Product list */}
                     <div style={{ maxHeight: 250, overflowY: 'auto' }}>
                       {filteredCatalog.slice(0, 20).map((p) => {
-                        const isCurrentlyMapped = mappedTillerIds.has(p.tiller_product_id)
-                        const isThisWine = mapping?.tiller_product_id === p.tiller_product_id
+                        const isActive = editingField === 'btl'
+                          ? mapping?.tiller_product_id === p.tiller_product_id
+                          : mapping?.tiller_verre_product_id === p.tiller_product_id
                         return (
-                          <button
-                            key={p.tiller_product_id}
-                            onClick={() => mapWineToProduct(wine.id, p, wine.au_verre)}
-                            disabled={saving || isThisWine}
-                            style={{
-                              display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-                              padding: '8px 10px', background: isThisWine ? T.up + '08' : 'transparent',
-                              border: 'none', borderBottom: `0.5px solid ${T.border}15`,
-                              color: T.text, fontSize: 12, cursor: isThisWine ? 'default' : 'pointer',
-                              textAlign: 'left', opacity: (isCurrentlyMapped && !isThisWine) ? 0.5 : 1,
-                            }}
-                          >
+                          <button key={p.tiller_product_id} onClick={() => mapProduct(wine.id, p, editingField)} disabled={saving || isActive}
+                            style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 10px', background: isActive ? T.up + '08' : 'transparent', border: 'none', borderBottom: `0.5px solid ${T.border}15`, color: T.text, fontSize: 12, cursor: isActive ? 'default' : 'pointer', textAlign: 'left' }}>
                             <div style={{ flex: 1 }}>
                               <div style={{ fontWeight: 500 }}>{p.name}</div>
-                              <div style={{ fontSize: 11, color: T.text2 }}>
-                                {p.category_name} · {p.price}€
-                                {isCurrentlyMapped && !isThisWine && <span style={{ marginLeft: 4, color: T.muted }}>(déjà lié)</span>}
-                              </div>
+                              <div style={{ fontSize: 11, color: T.text2 }}>{p.category_name} · {p.price}€</div>
                             </div>
-                            {isThisWine && <span style={{ fontSize: 11, color: T.up }}>✓ actif</span>}
+                            {isActive && <span style={{ fontSize: 11, color: T.up }}>✓ actif</span>}
                           </button>
                         )
                       })}
                     </div>
 
-                    {/* Unmap button */}
-                    {mapping && (
-                      <button
-                        onClick={() => unmapWine(wine.id)}
-                        style={{
-                          width: '100%', padding: '8px 0', borderRadius: 8, border: 'none',
-                          background: T.rose + '12', color: T.rose, fontSize: 12,
-                          cursor: 'pointer', marginTop: 8,
-                        }}
-                      >
-                        Dissocier ce produit Tiller
+                    {/* Unmap */}
+                    {editingField === 'btl' && mapping && (
+                      <button onClick={() => unmapField(wine.id, 'btl')} style={{ width: '100%', padding: '8px 0', borderRadius: 8, border: 'none', background: T.rose + '12', color: T.rose, fontSize: 12, cursor: 'pointer', marginTop: 8 }}>
+                        Dissocier la bouteille
+                      </button>
+                    )}
+                    {editingField === 'verre' && mapping?.tiller_verre_product_id && (
+                      <button onClick={() => unmapField(wine.id, 'verre')} style={{ width: '100%', padding: '8px 0', borderRadius: 8, border: 'none', background: T.rose + '12', color: T.rose, fontSize: 12, cursor: 'pointer', marginTop: 8 }}>
+                        Dissocier le verre
                       </button>
                     )}
                   </div>
