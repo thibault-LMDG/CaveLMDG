@@ -52,6 +52,10 @@ export interface Wine {
   commentaire_client: string | null
   commentaire_cuvee: string | null
   accords_carte: string | null
+  certification: string | null
+  sans_sulfites: boolean
+  non_filtre: boolean
+  levures_indigenes: boolean
   created_at: string
   updated_at: string
   // Joined

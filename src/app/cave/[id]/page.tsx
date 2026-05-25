@@ -18,11 +18,12 @@ export default function WineDetailPage() {
   const [confirmArchive, setConfirmArchive] = useState(false)
 
   const loadData = useCallback(async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('cave_wines')
       .select('*, cave_domains(nom, commentaire_domaine), cave_agents(nom, telephone)')
       .eq('id', id)
       .single()
+    console.log('WINE DATA:', JSON.stringify({ certification: data?.certification, sans_sulfites: data?.sans_sulfites, non_filtre: data?.non_filtre, levures_indigenes: data?.levures_indigenes, error }))
     setWine(data as typeof wine)
 
     const { data: mvts } = await supabase
@@ -139,6 +140,59 @@ export default function WineDetailPage() {
             🏠 Le domaine
           </div>
           <div style={{ fontSize: 13, color: T.text2, lineHeight: 1.5 }}>{wine.cave_domains.commentaire_domaine}</div>
+        </div>
+      )}
+
+      {/* 🌿 Identité vin */}
+      {wine.certification && wine.certification !== 'conventionnel' && (
+        <div style={{ margin: '0 16px 12px', padding: 14, borderRadius: 10, background: T.deep, border: `0.5px solid ${T.border}` }}>
+          <div style={{ fontSize: 10, color: T.up, fontWeight: 500, textTransform: 'uppercase', marginBottom: 10, letterSpacing: 0.5 }}>
+            🌿 Identité
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {/* Certification domaine */}
+            {wine.certification.startsWith('biodynamie') && (
+              <span style={{
+                padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500,
+                background: '#b07ae820', color: T.purple, border: `0.5px solid ${T.purple}30`,
+              }}>
+                🌙 Biodynamie{wine.certification === 'biodynamie-demeter' ? ' · Demeter' : wine.certification === 'biodynamie-biodyvin' ? ' · Biodyvin' : ''}
+              </span>
+            )}
+            {wine.certification === 'bio' && (
+              <span style={{
+                padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500,
+                background: T.up + '18', color: T.up, border: `0.5px solid ${T.up}30`,
+              }}>
+                🌱 Bio certifié
+              </span>
+            )}
+            {/* Vinification cuvée */}
+            {wine.sans_sulfites && (
+              <span style={{
+                padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500,
+                background: T.teal + '18', color: T.teal, border: `0.5px solid ${T.teal}30`,
+              }}>
+                Sans sulfites
+              </span>
+            )}
+            {wine.non_filtre && (
+              <span style={{
+                padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500,
+                background: T.teal + '18', color: T.teal, border: `0.5px solid ${T.teal}30`,
+              }}>
+                Non filtré
+              </span>
+            )}
+            {wine.levures_indigenes && (
+              <span style={{
+                padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500,
+                background: T.gold + '18', color: T.gold, border: `0.5px solid ${T.gold}30`,
+              }}>
+                Levures indigènes
+              </span>
+            )}
+          </div>
         </div>
       )}
 
