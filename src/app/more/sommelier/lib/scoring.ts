@@ -18,7 +18,7 @@ export interface SommelierFilters {
   budget: Budget | null
   occasion: Occasion | null
   // Affinages optionnels
-  region?: string | null
+  regions?: string[]
   cepage?: string | null
   plat?: string | null
   bio?: boolean
@@ -161,7 +161,9 @@ function pushBonus(wine: Wine, pushWineIds: Set<string>): number {
 // --- Filtres hard (affinages) ---
 
 function passesRefinements(wine: Wine, filters: SommelierFilters): boolean {
-  if (filters.region && wine.region !== filters.region) return false
+  if (filters.regions && filters.regions.length > 0) {
+    if (!filters.regions.includes(wine.region)) return false
+  }
   if (filters.cepage) {
     const wCepage = (wine.cepage || '').toLowerCase()
     if (!wCepage.includes(filters.cepage.toLowerCase())) return false
@@ -176,6 +178,42 @@ function passesRefinements(wine: Wine, filters: SommelierFilters): boolean {
     if (!isBio && !isNature) return false
   }
   return true
+}
+
+// --- Bonus région LMDG ---
+// Pondération des régions adaptée au contexte de La Marine des Goudes (Marseille)
+// Les clients d'un restaurant de bord de mer à Marseille cherchent en priorité
+// du Provence, puis Bourgogne/Loire (gastronomie), Rhône (terroir proche), etc.
+// Les régions très pointues (Alsace, Jura, Savoie) sont pénalisées car moins
+// demandées par la clientèle classique d'un restaurant de bord de mer.
+
+const REGION_WEIGHTS: Record<string, number> = {
+  'Provence': 15,
+  'Bourgogne': 10,
+  'Loire': 9,
+  'Vallée du Rhône': 8,
+  'Rhône': 8,
+  'Languedoc': 7,
+  'Languedoc-Roussillon': 7,
+  'Bordeaux': 6,
+  'Corse': 5,
+  'Sud-Ouest': 4,
+  'Champagne': 4,
+  'Roussillon': 4,
+  'Beaujolais': 3,
+  'Savoie': 1,
+  'Jura': 1,
+  'Alsace': 0,
+}
+
+function scoreRegion(wine: Wine): number {
+  const region = wine.region || ''
+  // Cherche la correspondance exacte ou partielle
+  for (const [key, weight] of Object.entries(REGION_WEIGHTS)) {
+    if (region.toLowerCase().includes(key.toLowerCase())) return weight
+  }
+  // Régions non listées = score neutre
+  return 3
 }
 
 // --- Moteur principal ---
@@ -204,7 +242,7 @@ export function scoreWines(
     
     return {
       wine,
-      score: vibeScore + intensityScore + budgetScore + occasionScore + push,
+      score: vibeScore + intensityScore + budgetScore + occasionScore + push + scoreRegion(wine),
       vibeScore,
       intensityScore,
       budgetScore,

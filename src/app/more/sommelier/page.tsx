@@ -29,7 +29,7 @@ export default function SommelierPage() {
   const [occasion, setOccasion] = useState<Occasion | null>(null)
 
   // Affinages
-  const [region, setRegion] = useState<string | null>(null)
+  const [regions, setRegions] = useState<string[]>([])
   const [cepage, setCepage] = useState<string | null>(null)
   const [plat, setPlat] = useState<string | null>(null)
   const [bio, setBio] = useState(false)
@@ -64,8 +64,8 @@ export default function SommelierPage() {
   // Scored results
   const results: ScoredWine[] = useMemo(() => {
     if (!vibe) return []
-    return scoreWines(wines, { vibe, intensity, budget, occasion, region, cepage, plat, bio }, pushWineIds)
-  }, [wines, vibe, intensity, budget, occasion, region, cepage, plat, bio, pushWineIds])
+    return scoreWines(wines, { vibe, intensity, budget, occasion, regions, cepage, plat, bio }, pushWineIds)
+  }, [wines, vibe, intensity, budget, occasion, regions, cepage, plat, bio, pushWineIds])
 
   // Count how many questions answered (for progressive reveal)
   const answered = [vibe, intensity, budget, occasion].filter(Boolean).length
@@ -76,7 +76,7 @@ export default function SommelierPage() {
     setIntensity(null)
     setBudget(null)
     setOccasion(null)
-    setRegion(null)
+    setRegions([])
     setCepage(null)
     setPlat(null)
     setBio(false)
@@ -168,11 +168,11 @@ export default function SommelierPage() {
             regions={availableFilters.regions}
             cepages={availableFilters.cepages}
             plats={availableFilters.plats}
-            selectedRegion={region}
+            selectedRegions={regions}
             selectedCepage={cepage}
             selectedPlat={plat}
             selectedBio={bio}
-            onRegion={setRegion}
+            onRegions={setRegions}
             onCepage={setCepage}
             onPlat={setPlat}
             onBio={setBio}

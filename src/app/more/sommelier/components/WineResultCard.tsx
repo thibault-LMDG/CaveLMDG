@@ -6,7 +6,7 @@ import { T, wineTypeColor, wineTypeEmoji } from '@/lib/theme'
 import type { ScoredWine } from '../lib/scoring'
 
 export default function WineResultCard({ result }: { result: ScoredWine }) {
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(true)
   const w = result.wine
   const domain = w.cave_domains
   const typeColor = wineTypeColor[w.type] || T.text2
