@@ -5,10 +5,10 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { T } from '@/lib/theme'
 import type { Wine } from '@/types'
-import { Vibe, Intensity, Budget, Occasion } from './lib/vibeMapping'
+import { WineColor, StyleOption, Budget, Occasion } from './lib/vibeMapping'
 import { scoreWines, extractAvailableFilters, ScoredWine } from './lib/scoring'
-import VibeSelector from './components/VibeSelector'
-import IntensitySelector from './components/IntensitySelector'
+import ColorSelector from './components/ColorSelector'
+import StyleSelector from './components/StyleSelector'
 import BudgetSelector from './components/BudgetSelector'
 import OccasionSelector from './components/OccasionSelector'
 import RefinementFilters from './components/RefinementFilters'
@@ -22,9 +22,9 @@ export default function SommelierPage() {
   const [pushWineIds, setPushWineIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
 
-  // 4 questions cœur
-  const [vibe, setVibe] = useState<Vibe | null>(null)
-  const [intensity, setIntensity] = useState<Intensity | null>(null)
+  // Questions
+  const [color, setColor] = useState<WineColor | null>(null)
+  const [style, setStyle] = useState<StyleOption | null>(null)
   const [budget, setBudget] = useState<Budget | null>(null)
   const [occasion, setOccasion] = useState<Occasion | null>(null)
 
@@ -58,22 +58,35 @@ export default function SommelierPage() {
     load()
   }, [])
 
+  // Count wines per color
+  const colorCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    wines.filter(w => w.quantite_stock > 0 && w.statut === 'actif').forEach(w => {
+      counts[w.type] = (counts[w.type] || 0) + 1
+    })
+    return counts as Record<WineColor, number>
+  }, [wines])
+
   // Available filters
   const availableFilters = useMemo(() => extractAvailableFilters(wines), [wines])
 
   // Scored results
   const results: ScoredWine[] = useMemo(() => {
-    if (!vibe) return []
-    return scoreWines(wines, { vibe, intensity, budget, occasion, regions, cepage, plat, bio }, pushWineIds)
-  }, [wines, vibe, intensity, budget, occasion, regions, cepage, plat, bio, pushWineIds])
+    if (!color) return []
+    return scoreWines(wines, { color, style, budget, occasion, regions, cepage, plat, bio }, pushWineIds)
+  }, [wines, color, style, budget, occasion, regions, cepage, plat, bio, pushWineIds])
 
-  // Count how many questions answered (for progressive reveal)
-  const answered = [vibe, intensity, budget, occasion].filter(Boolean).length
+  const answered = [color, style, budget, occasion].filter(Boolean).length
 
-  // Reset
+  // Reset (clear style when color changes)
+  const handleColorSelect = (c: WineColor) => {
+    setColor(c)
+    setStyle(null) // les styles changent selon la couleur
+  }
+
   const handleReset = () => {
-    setVibe(null)
-    setIntensity(null)
+    setColor(null)
+    setStyle(null)
     setBudget(null)
     setOccasion(null)
     setRegions([])
@@ -120,26 +133,26 @@ export default function SommelierPage() {
 
       {/* Question flow */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-        {/* Q1 — Toujours visible */}
-        <VibeSelector selected={vibe} onSelect={setVibe} />
+        {/* Q1 — Couleur */}
+        <ColorSelector selected={color} onSelect={handleColorSelect} counts={colorCounts} />
 
-        {/* Q2 — Après Q1 */}
-        {vibe && (
-          <IntensitySelector selected={intensity} onSelect={setIntensity} />
+        {/* Q2 — Style (adapté à la couleur) */}
+        {color && (
+          <StyleSelector color={color} selected={style} onSelect={setStyle} />
         )}
 
-        {/* Q3 — Après Q2 */}
-        {vibe && intensity && (
+        {/* Q3 — Budget */}
+        {color && style && (
           <BudgetSelector selected={budget} onSelect={setBudget} />
         )}
 
-        {/* Q4 — Après Q3 */}
-        {vibe && intensity && budget && (
+        {/* Q4 — Occasion */}
+        {color && style && budget && (
           <OccasionSelector selected={occasion} onSelect={setOccasion} />
         )}
       </div>
 
-      {/* Results */}
+      {/* Results — dès que la couleur est choisie */}
       {results.length > 0 && (
         <div style={{ marginTop: 24 }}>
           <div style={{
@@ -153,7 +166,7 @@ export default function SommelierPage() {
           }}>
             <span>Nos recommandations</span>
             <span style={{ fontSize: 11, color: T.muted, fontWeight: 400 }}>
-              {answered}/4 questions
+              {answered}/4 critères
             </span>
           </div>
 
@@ -180,8 +193,8 @@ export default function SommelierPage() {
         </div>
       )}
 
-      {/* No results message */}
-      {vibe && results.length === 0 && answered >= 2 && (
+      {/* No results */}
+      {color && results.length === 0 && answered >= 2 && (
         <div style={{
           marginTop: 24,
           padding: 20,
@@ -196,7 +209,7 @@ export default function SommelierPage() {
         </div>
       )}
 
-      {/* AI Sommelier — always visible at the bottom */}
+      {/* AI Sommelier */}
       <AISommelier wines={wines} />
     </div>
   )

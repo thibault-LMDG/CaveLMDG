@@ -1,8 +1,8 @@
 // Sommelier — Moteur de scoring client-side
-// Objectif: < 1ms pour 78 vins, recalcul à chaque tap
+// Flow: Couleur (filtre hard) → Style (scoring vibes) → Budget → Occasion
 
 import type { Wine } from '@/types'
-import { Vibe, Intensity, Budget, Occasion, VIBE_TYPE_MAP, INTENSITY_VIBE_MAP, BUDGETS } from './vibeMapping'
+import { WineColor, StyleOption, Budget, Occasion, STYLES_BY_COLOR, BUDGETS } from './vibeMapping'
 
 export interface ScoredWine {
   wine: Wine & { cave_domains?: { nom: string; commentaire_domaine: string | null } }
@@ -13,8 +13,8 @@ export interface ScoredWine {
 }
 
 export interface SommelierFilters {
-  vibe: Vibe | null
-  intensity: Intensity | null
+  color: WineColor | null
+  style: StyleOption | null
   budget: Budget | null
   occasion: Occasion | null
   // Affinages optionnels
@@ -27,154 +27,129 @@ export interface SommelierFilters {
 type ScoredWineRaw = {
   wine: Wine & { cave_domains?: { nom: string; commentaire_domaine: string | null } }
   score: number
-  vibeScore: number
-  intensityScore: number
+  styleScore: number
   budgetScore: number
   occasionScore: number
 }
 
-// --- Score individuel par critère ---
+// --- Score par style ---
 
-function scoreVibe(wine: Wine, vibe: Vibe): number {
-  if (vibe === 'surprise') return 10 + Math.random() * 5 // random pondéré
+function scoreStyle(wine: Wine, style: StyleOption): number {
+  // Surprise = random pondéré
+  if (style.id === 'surprise') return 10 + Math.random() * 15
 
   const vibes = wine.profil_vibes || []
-  
+  const targetVibes = style.vibes
+
   // Match direct dans profil_vibes
-  if (vibes.includes(vibe)) return 40
-  
-  // Match partiel (le vin a une vibe proche)
-  const related: Record<string, string[]> = {
-    festif: ['frais', 'léger'],
-    frais: ['festif', 'léger', 'fin'],
-    fin: ['frais', 'élégant', 'minéral'],
-    fruité: ['gourmand', 'rond', 'souple'],
-    puissant: ['costaud', 'tannique', 'charpenté'],
-    doux: ['moelleux', 'sucré'],
+  const directMatches = targetVibes.filter(v => vibes.includes(v)).length
+  if (directMatches >= 2) return 40
+  if (directMatches === 1) return 30
+
+  // Match partiel — le vin a des vibes proches
+  const proximity: Record<string, string[]> = {
+    frais: ['vif', 'minéral', 'salin', 'léger', 'fin'],
+    minéral: ['frais', 'vif', 'salin', 'tendu'],
+    fin: ['élégant', 'délicat', 'floral', 'soyeux'],
+    fruité: ['gourmand', 'croquant', 'rond', 'souple'],
+    rond: ['généreux', 'ample', 'gras', 'boisé'],
+    puissant: ['costaud', 'tannique', 'charpenté', 'structuré'],
+    léger: ['frais', 'aérien', 'facile', 'souple'],
+    doux: ['moelleux', 'sucré', 'miel'],
+    élégant: ['fin', 'soyeux', 'délicat'],
   }
-  const relatedVibes = related[vibe] || []
-  if (vibes.some(v => relatedVibes.includes(v))) return 25
-  
-  // Fallback sur le type de vin
-  const allowedTypes = VIBE_TYPE_MAP[vibe]
-  if (allowedTypes.includes(wine.type)) return 15
-  
-  return 0
+
+  let proxScore = 0
+  for (const target of targetVibes) {
+    const related = proximity[target] || []
+    if (vibes.some(v => related.includes(v))) proxScore += 8
+  }
+  if (proxScore > 0) return Math.min(proxScore, 25)
+
+  return 5 // fallback minimal
 }
 
-function scoreIntensity(wine: Wine, intensity: Intensity): number {
-  const vibes = wine.profil_vibes || []
-  const expectedVibes = INTENSITY_VIBE_MAP[intensity]
-  
-  // Match direct
-  if (vibes.some(v => expectedVibes.includes(v))) return 25
-  
-  // Heuristique par type si pas de vibes
-  if (vibes.length === 0) {
-    const typeIntensity: Record<string, Intensity> = {
-      BULLE: 'léger',
-      BLANC: 'léger',
-      ROSÉ: 'léger',
-      ROUGE: 'costaud',
-      'DEMI-SEC': 'équilibré',
-    }
-    if (typeIntensity[wine.type] === intensity) return 15
-    if (intensity === 'équilibré') return 10 // équilibré match un peu tout
-  }
-  
-  return 0
-}
+// --- Score budget ---
 
 function scoreBudget(wine: Wine, budget: Budget): number {
   const prix = wine.prix_vente
-  
+
   if (budget === 'any') {
-    // Pas de limite → léger bonus aux vins premium (belles bouteilles)
     if (prix >= 90) return 25
     if (prix >= 55) return 22
     return 18
   }
-  
-  const budgetDef = BUDGETS.find(b => b.id === budget)
-  if (!budgetDef) return 0
-  
-  const [min, max] = budgetDef.range
-  
+
   if (budget === 'plaisir') {
-    // Se faire plaisir (>55€) → favoriser les vins 90-150€ aussi
     if (prix >= 90 && prix <= 150) return 25
     if (prix >= 55) return 20
     if (prix >= 45) return 10
     return 0
   }
-  
-  // Fourchettes classiques
+
+  const budgetDef = BUDGETS.find(b => b.id === budget)
+  if (!budgetDef) return 0
+  const [min, max] = budgetDef.range
+
   if (prix >= min && prix <= max) return 20
-  
-  // Proche (±10€) = score partiel
   const dist = prix < min ? min - prix : prix - max
   if (dist <= 10) return 10
-  
   return 0
 }
 
+// --- Score occasion ---
+
 function scoreOccasion(wine: Wine, occasion: Occasion): number {
   const vibes = wine.profil_vibes || []
-  const bevcost = wine.bevcost_pct || 50
-  
+
   switch (occasion) {
-    case 'fête':
-      // Biais vers les belles bouteilles, prix élevé, histoire à raconter
-      let feteScore = 0
-      if (wine.prix_vente > 50) feteScore += 8
-      if (wine.prix_vente > 80) feteScore += 5
-      if (wine.cave_domains?.commentaire_domaine) feteScore += 3
-      return feteScore
-      
-    case 'tranquille':
-      // Valeur sûre, bon rapport, stock confortable
-      let tranqScore = 0
-      if (bevcost < 35) tranqScore += 5
-      if (wine.quantite_stock > 3) tranqScore += 5
-      if (wine.prix_vente < 50) tranqScore += 5
-      return tranqScore
-      
-    case 'découverte':
-      // Original, cépages rares, vins qu'on vend peu
-      let decScore = 0
-      if (vibes.includes('original') || vibes.includes('rare')) decScore += 8
-      // Vins avec un stock élevé = moins vendus = plus "découverte"
-      if (wine.quantite_stock > 6) decScore += 4
-      // Certification bio/nature = souvent plus original
-      if (wine.certification && wine.certification !== 'conventionnel') decScore += 3
-      return decScore
-      
-    case 'soif':
-      // Simple, prix bas, frais, léger
-      let soifScore = 0
-      if (wine.prix_vente < 35) soifScore += 5
-      if (vibes.includes('frais') || vibes.includes('léger')) soifScore += 5
-      if (wine.type === 'BLANC' || wine.type === 'ROSÉ') soifScore += 3
-      return soifScore
-      
+    case 'fête': {
+      let s = 0
+      if (wine.prix_vente > 50) s += 8
+      if (wine.prix_vente > 80) s += 5
+      if (wine.cave_domains?.commentaire_domaine) s += 3
+      return s
+    }
+    case 'tranquille': {
+      let s = 0
+      if ((wine.bevcost_pct || 50) < 35) s += 5
+      if (wine.quantite_stock > 3) s += 5
+      if (wine.prix_vente < 50) s += 5
+      return s
+    }
+    case 'découverte': {
+      let s = 0
+      if (vibes.includes('original') || vibes.includes('rare')) s += 8
+      if (wine.quantite_stock > 6) s += 4
+      if (wine.certification && wine.certification !== 'conventionnel') s += 3
+      return s
+    }
+    case 'soif': {
+      let s = 0
+      if (wine.prix_vente < 35) s += 5
+      if (vibes.includes('frais') || vibes.includes('léger')) s += 5
+      return s
+    }
     default:
       return 0
   }
 }
 
-// --- Bonus push (cave_brief_push, stock dormant) ---
+// --- Bonus push ---
 
 function pushBonus(wine: Wine, pushWineIds: Set<string>): number {
   let bonus = 0
   if (pushWineIds.has(wine.id)) bonus += 10
-  // Stock dormant (> 8 btl sans vibe 'rare') → léger bonus pour écouler
   if (wine.quantite_stock > 8 && !(wine.profil_vibes || []).includes('rare')) bonus += 3
   return bonus
 }
 
-// --- Filtres hard (affinages) ---
+// --- Filtres hard ---
 
-function passesRefinements(wine: Wine, filters: SommelierFilters): boolean {
+function passesFilters(wine: Wine, filters: SommelierFilters): boolean {
+  // Filtre couleur — hard filter
+  if (filters.color && wine.type !== filters.color) return false
+  // Affinages
   if (filters.regions && filters.regions.length > 0) {
     if (!filters.regions.includes(wine.region)) return false
   }
@@ -195,11 +170,6 @@ function passesRefinements(wine: Wine, filters: SommelierFilters): boolean {
 }
 
 // --- Bonus région LMDG ---
-// Pondération des régions adaptée au contexte de La Marine des Goudes (Marseille)
-// Les clients d'un restaurant de bord de mer à Marseille cherchent en priorité
-// du Provence, puis Bourgogne/Loire (gastronomie), Rhône (terroir proche), etc.
-// Les régions très pointues (Alsace, Jura, Savoie) sont pénalisées car moins
-// demandées par la clientèle classique d'un restaurant de bord de mer.
 
 const REGION_WEIGHTS: Record<string, number> = {
   'Provence': 15,
@@ -222,11 +192,9 @@ const REGION_WEIGHTS: Record<string, number> = {
 
 function scoreRegion(wine: Wine): number {
   const region = wine.region || ''
-  // Cherche la correspondance exacte ou partielle
   for (const [key, weight] of Object.entries(REGION_WEIGHTS)) {
     if (region.toLowerCase().includes(key.toLowerCase())) return weight
   }
-  // Régions non listées = score neutre
   return 3
 }
 
@@ -237,42 +205,33 @@ export function scoreWines(
   filters: SommelierFilters,
   pushWineIds: Set<string> = new Set()
 ): ScoredWine[] {
-  // Uniquement les vins en stock et actifs
   const available = wines.filter(w => w.quantite_stock > 0 && w.statut === 'actif')
-  
-  // Appliquer les filtres hard (affinages)
-  const filtered = available.filter(w => passesRefinements(w, filters))
-  
-  // Si aucune question n'est encore répondue, retourner vide
-  if (!filters.vibe) return []
-  
-  // Scorer chaque vin
+  const filtered = available.filter(w => passesFilters(w, filters))
+
+  // Il faut au moins la couleur pour commencer
+  if (!filters.color) return []
+
   const scored: ScoredWineRaw[] = filtered.map(wine => {
-    const vibeScore = filters.vibe ? scoreVibe(wine, filters.vibe) : 0
-    const intensityScore = filters.intensity ? scoreIntensity(wine, filters.intensity) : 0
+    const styleScore = filters.style ? scoreStyle(wine, filters.style) : 10 // base si pas encore choisi
     const budgetScore = filters.budget ? scoreBudget(wine, filters.budget) : 0
     const occasionScore = filters.occasion ? scoreOccasion(wine, filters.occasion) : 0
     const push = pushBonus(wine, pushWineIds)
-    
+
     return {
       wine,
-      score: vibeScore + intensityScore + budgetScore + occasionScore + push + scoreRegion(wine),
-      vibeScore,
-      intensityScore,
+      score: styleScore + budgetScore + occasionScore + push + scoreRegion(wine),
+      styleScore,
       budgetScore,
       occasionScore,
     }
   })
-  
-  // Trier par score décroissant
+
   scored.sort((a, b) => b.score - a.score)
-  
   if (scored.length === 0) return []
-  
-  // Sélectionner les 3 picks avec labels distincts
+
   const results: ScoredWine[] = []
-  
-  // 🎯 Meilleur accord = meilleur score global
+
+  // 🎯 Meilleur accord
   if (scored[0]) {
     results.push({
       wine: scored[0].wine,
@@ -282,8 +241,8 @@ export function scoreWines(
       labelText: 'Meilleur accord',
     })
   }
-  
-  // 💎 Rapport qualité-prix = meilleur ratio score/prix parmi le top 10
+
+  // 💎 Rapport qualité-prix
   const top10 = scored.slice(0, 10)
   const bestRatio = top10
     .filter(s => s.wine.id !== results[0]?.wine.id)
@@ -292,7 +251,7 @@ export function scoreWines(
       const ratioB = b.score / (b.wine.prix_vente || 1)
       return ratioB - ratioA
     })[0]
-  
+
   if (bestRatio) {
     results.push({
       wine: bestRatio.wine,
@@ -302,12 +261,12 @@ export function scoreWines(
       labelText: 'Rapport qualité-prix',
     })
   }
-  
-  // ⭐ Coup de cœur Thibault = vin push OU prochain meilleur score
+
+  // ⭐ Coup de cœur de Thibault
   const usedIds = new Set(results.map(r => r.wine.id))
   const pushWine = scored.find(s => pushWineIds.has(s.wine.id) && !usedIds.has(s.wine.id) && s.score > 15)
   const coeur = pushWine || scored.find(s => !usedIds.has(s.wine.id))
-  
+
   if (coeur) {
     results.push({
       wine: coeur.wine,
@@ -317,30 +276,27 @@ export function scoreWines(
       labelText: 'Coup de cœur de Thibault',
     })
   }
-  
+
   return results
 }
 
-// --- Extraction des filtres disponibles depuis les vins ---
+// --- Extraction des filtres disponibles ---
 
 export function extractAvailableFilters(wines: Wine[]) {
   const active = wines.filter(w => w.quantite_stock > 0 && w.statut === 'actif')
-  
+
   const regions = [...new Set(active.map(w => w.region).filter(Boolean))].sort()
-  
-  // Extraire les cépages individuels (parsés depuis le champ texte)
+
   const cepageSet = new Set<string>()
   active.forEach(w => {
     if (!w.cepage) return
-    // Parse "60% Grenache, 30% Syrah" → ['Grenache', 'Syrah']
     w.cepage.split(/[,;]/).forEach(c => {
       const name = c.replace(/\d+%?\s*/g, '').trim()
       if (name.length > 1) cepageSet.add(name)
     })
   })
   const cepages = [...cepageSet].sort()
-  
-  // Extraire les plats depuis accords_carte
+
   const platSet = new Set<string>()
   active.forEach(w => {
     if (!w.accords_carte) return
@@ -350,6 +306,6 @@ export function extractAvailableFilters(wines: Wine[]) {
     })
   })
   const plats = [...platSet].sort()
-  
+
   return { regions, cepages, plats }
 }
