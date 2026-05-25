@@ -18,11 +18,12 @@ export default function WineDetailPage() {
   const [confirmArchive, setConfirmArchive] = useState(false)
 
   const loadData = useCallback(async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('cave_wines')
       .select('*, cave_domains(nom, commentaire_domaine), cave_agents(nom, telephone)')
       .eq('id', id)
       .single()
+    console.log('WINE DATA:', JSON.stringify({ certification: data?.certification, sans_sulfites: data?.sans_sulfites, non_filtre: data?.non_filtre, levures_indigenes: data?.levures_indigenes, error }))
     setWine(data as typeof wine)
 
     const { data: mvts } = await supabase
