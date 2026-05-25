@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { T } from '@/lib/theme'
 
 const menuItems = [
+  { href: '/more/sommelier', emoji: '🍷', label: 'Sommelier', desc: 'Recommandation vin pour le client', highlight: true },
   { href: '/more/agents', emoji: '📞', label: 'Fournisseurs & Agents', desc: 'Annuaire, conditions franco' },
   { href: '/more/domains', emoji: '🏠', label: 'Domaines', desc: 'Histoire, terroir et vins par domaine' },
   { href: '/more/pricing', emoji: '💰', label: 'Grille de pricing', desc: 'Coefficients et BevCost' },
@@ -33,9 +34,9 @@ export default function MorePage() {
                 alignItems: 'center',
                 gap: 12,
                 padding: '14px 14px',
-                background: T.deep,
+                background: (item as { highlight?: boolean }).highlight ? `${T.gold}12` : T.deep,
                 borderRadius: 10,
-                border: `0.5px solid ${T.border}`,
+                border: `0.5px solid ${(item as { highlight?: boolean }).highlight ? `${T.gold}30` : T.border}`,
                 textDecoration: 'none',
                 color: T.text,
                 opacity: item.disabled ? 0.4 : 1,

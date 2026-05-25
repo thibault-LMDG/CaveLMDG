@@ -56,6 +56,7 @@ export interface Wine {
   sans_sulfites: boolean
   non_filtre: boolean
   levures_indigenes: boolean
+  profil_vibes: string[]
   created_at: string
   updated_at: string
   // Joined
