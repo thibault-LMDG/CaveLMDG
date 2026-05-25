@@ -24,9 +24,16 @@ export default function WineDetailPage() {
       .eq('id', id)
       .single()
 
-    // Fetch certifications via RPC (contourne le cache PostgREST sur les nouvelles colonnes)
-    const { data: certData } = await supabase.rpc('get_wine_certifications', { wine_uuid: id })
-    const merged = data ? { ...data, ...(certData || {}) } : data
+    // Fetch certifications séparément (nouvelles colonnes pas encore dans le cache PostgREST *)
+    const { data: certRow } = await supabase.rpc('get_wine_certifications', { wine_uuid: id })
+    const cert = certRow || {}
+    const merged = data ? {
+      ...data,
+      certification: cert.certification ?? data.certification ?? 'conventionnel',
+      sans_sulfites: cert.sans_sulfites ?? data.sans_sulfites ?? false,
+      non_filtre: cert.non_filtre ?? data.non_filtre ?? false,
+      levures_indigenes: cert.levures_indigenes ?? data.levures_indigenes ?? false,
+    } : data
     setWine(merged as typeof wine)
 
     const { data: mvts } = await supabase
