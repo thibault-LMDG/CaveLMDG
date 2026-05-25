@@ -86,15 +86,29 @@ function scoreIntensity(wine: Wine, intensity: Intensity): number {
 }
 
 function scoreBudget(wine: Wine, budget: Budget): number {
-  if (budget === 'any') return 20 // pas de préférence = score neutre
+  const prix = wine.prix_vente
+  
+  if (budget === 'any') {
+    // Pas de limite → léger bonus aux vins premium (belles bouteilles)
+    if (prix >= 90) return 25
+    if (prix >= 55) return 22
+    return 18
+  }
   
   const budgetDef = BUDGETS.find(b => b.id === budget)
   if (!budgetDef) return 0
   
   const [min, max] = budgetDef.range
-  const prix = wine.prix_vente
   
-  // Dans la fourchette = score max
+  if (budget === 'plaisir') {
+    // Se faire plaisir (>55€) → favoriser les vins 90-150€ aussi
+    if (prix >= 90 && prix <= 150) return 25
+    if (prix >= 55) return 20
+    if (prix >= 45) return 10
+    return 0
+  }
+  
+  // Fourchettes classiques
   if (prix >= min && prix <= max) return 20
   
   // Proche (±10€) = score partiel
@@ -289,7 +303,7 @@ export function scoreWines(
     })
   }
   
-  // ⭐ Coup de cœur Charlotte = vin push OU prochain meilleur score
+  // ⭐ Coup de cœur Thibault = vin push OU prochain meilleur score
   const usedIds = new Set(results.map(r => r.wine.id))
   const pushWine = scored.find(s => pushWineIds.has(s.wine.id) && !usedIds.has(s.wine.id) && s.score > 15)
   const coeur = pushWine || scored.find(s => !usedIds.has(s.wine.id))
@@ -300,7 +314,7 @@ export function scoreWines(
       score: coeur.score,
       label: 'coeur',
       labelEmoji: '⭐',
-      labelText: 'Coup de cœur Charlotte',
+      labelText: 'Coup de cœur de Thibault',
     })
   }
   
