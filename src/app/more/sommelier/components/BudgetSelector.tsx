@@ -7,7 +7,7 @@ export default function BudgetSelector({ selected, onSelect }: { selected: Budge
   return (
     <div>
       <div style={{ fontSize: 15, fontWeight: 500, color: T.text, marginBottom: 10 }}>
-        Budget ?
+        Quel budget pour la bouteille ?
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
         {BUDGETS.map((b, idx) => {

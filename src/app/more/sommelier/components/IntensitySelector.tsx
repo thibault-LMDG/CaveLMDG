@@ -7,7 +7,7 @@ export default function IntensitySelector({ selected, onSelect }: { selected: In
   return (
     <div>
       <div style={{ fontSize: 15, fontWeight: 500, color: T.text, marginBottom: 10 }}>
-        Plutôt léger ou costaud ?
+        Dans quel registre ?
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
         {INTENSITIES.map(i => {

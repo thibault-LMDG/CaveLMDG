@@ -7,7 +7,7 @@ export default function OccasionSelector({ selected, onSelect }: { selected: Occ
   return (
     <div>
       <div style={{ fontSize: 15, fontWeight: 500, color: T.text, marginBottom: 10 }}>
-        Une occasion particulière ?
+        C'est pour quelle occasion ?
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
         {OCCASIONS.map(o => {

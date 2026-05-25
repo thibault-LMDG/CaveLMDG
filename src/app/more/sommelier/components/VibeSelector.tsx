@@ -7,7 +7,7 @@ export default function VibeSelector({ selected, onSelect }: { selected: Vibe | 
   return (
     <div>
       <div style={{ fontSize: 15, fontWeight: 500, color: T.text, marginBottom: 10 }}>
-        Quelle envie ?
+        Qu'est-ce qui vous ferait plaisir ?
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
         {VIBES.map(v => {
