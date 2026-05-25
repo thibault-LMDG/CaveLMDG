@@ -49,14 +49,29 @@ export async function GET() {
     }
 
     // 4. Get recent sales from lignes_produits (last 7 days to cover any gaps)
+    // Paginate to avoid Supabase 1000-row default limit
     const sevenDaysAgo = new Date()
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-    const { data: salesData, error: salesErr } = await supabase
-      .from('lignes_produits')
-      .select('id, produit, quantite, created_at')
-      .gte('created_at', sevenDaysAgo.toISOString())
-      .order('created_at', { ascending: true })
-    if (salesErr) throw salesErr
+    const salesData: Array<{ id: string; produit: string; quantite: number; created_at: string }> = []
+    const PAGE_SIZE = 1000
+    let from = 0
+    let hasMore = true
+    while (hasMore) {
+      const { data: page, error: pageErr } = await supabase
+        .from('lignes_produits')
+        .select('id, produit, quantite, created_at')
+        .gte('created_at', sevenDaysAgo.toISOString())
+        .order('created_at', { ascending: true })
+        .range(from, from + PAGE_SIZE - 1)
+      if (pageErr) throw pageErr
+      if (page && page.length > 0) {
+        salesData.push(...page)
+        from += PAGE_SIZE
+        hasMore = page.length === PAGE_SIZE
+      } else {
+        hasMore = false
+      }
+    }
 
     // 5. Match and filter
     const newSales: Array<{
