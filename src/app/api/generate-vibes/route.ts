@@ -29,19 +29,27 @@ export async function POST() {
       return `${idx + 1}. [${w.id}] ${(domain as { nom: string } | null)?.nom || ''} ${w.cuvee || ''} | ${w.type} | ${w.region} | ${w.cepage || '?'} | ${w.prix_vente}€ | Cert: ${w.certification || 'conv'} ${w.sans_sulfites ? '· sans sulfites' : ''} ${w.non_filtre ? '· non filtré' : ''} | ${w.commentaire_cuvee || ''}`
     }).join('\n')
 
-    const prompt = `Tu es sommelier expert. Pour chaque vin ci-dessous, attribue 2-4 tags de profil parmi ce vocabulaire STRICT :
+    const prompt = `Tu es sommelier expert dans un restaurant de bord de mer à Marseille (La Marine des Goudes). Pour chaque vin ci-dessous, attribue 3-5 tags de profil parmi ce vocabulaire STRICT :
 
-VIBES (style/envie) : festif, frais, fin, fruité, puissant, doux
-INTENSITE : léger, équilibré, costaud
-QUALITES : minéral, floral, boisé, tannique, rond, vif, épicé, gourmand, délicat, souple, original, rare
+STYLE : frais, minéral, vif, salin, floral, délicat, fin, élégant, soyeux, rond, généreux, ample, boisé, fruité, gourmand, croquant, souple, puissant, costaud, tannique, charpenté, structuré, doux, moelleux, festif, léger, aérien, sec, tendu, original, rare
 
 Règles :
-- Chaque vin doit avoir au moins 1 vibe + 1 intensité
+- Attribue 3 à 5 tags par vin, en étant précis et discriminant
 - Base-toi sur le cépage, la région, le type, le commentaire de cuvée et la certification
-- Les vins bio/nature/sans sulfites ont souvent le tag "original"
-- Les bulles sont souvent "festif" + "léger"
-- Les blancs de Provence/Loire sont souvent "frais" + "léger" ou "minéral"
-- Les rouges du Rhône/Languedoc sont souvent "fruité" ou "puissant" + "costaud"
+- BLANCS frais/minéraux de Provence/Loire/Bourgogne : frais, minéral, vif, salin, tendu, fin
+- BLANCS ronds/boisés (Bourgogne élevé, Rhône) : rond, généreux, ample, boisé
+- BLANCS aromatiques (Alsace, Viognier) : floral, délicat, fin, élégant
+- ROUGES légers/fruités (Beaujolais, Pinot, jeunes) : fruité, croquant, souple, léger
+- ROUGES élégants (Bourgogne, Loire) : élégant, soyeux, fin
+- ROUGES puissants (Rhône, Languedoc, Bordeaux) : puissant, structuré, tannique, charpenté, costaud
+- ROSÉS pâles/gastronomiques : frais, minéral, fin, sec, tendu
+- ROSÉS fruités/estivaux : fruité, gourmand, rond, léger
+- BULLES vives : frais, vif, festif, léger
+- BULLES vineuses/complexes : fin, élégant, rond, généreux
+- DEMI-SEC légers : doux, fruité, léger
+- DEMI-SEC riches : doux, puissant, rond, généreux
+- Vins bio/nature/sans sulfites : ajouter "original" si pertinent
+- Vins de petits producteurs/cépages rares : ajouter "rare"
 
 VINS :
 ${wineList}
@@ -58,7 +66,7 @@ Réponds UNIQUEMENT en JSON valide, sans markdown, sans backticks :
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 4000,
+        max_tokens: 8000,
         messages: [{ role: 'user', content: prompt }],
       }),
     })
