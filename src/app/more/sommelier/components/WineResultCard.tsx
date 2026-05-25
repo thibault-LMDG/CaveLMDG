@@ -6,7 +6,7 @@ import { T, wineTypeColor, wineTypeEmoji } from '@/lib/theme'
 import type { ScoredWine } from '../lib/scoring'
 
 export default function WineResultCard({ result }: { result: ScoredWine }) {
-  const [expanded, setExpanded] = useState(true)
+  const [expanded, setExpanded] = useState(false)
   const w = result.wine
   const domain = w.cave_domains
   const typeColor = wineTypeColor[w.type] || T.text2
@@ -22,15 +22,22 @@ export default function WineResultCard({ result }: { result: ScoredWine }) {
   if (w.non_filtre) certBadges.push('🫗 Non filtré')
   if (w.levures_indigenes) certBadges.push('🦠 Levures indigènes')
 
+  // Infos compactes secondaires (cépages + accords en une ligne)
+  const shortInfos: string[] = []
+  if (w.cepage) shortInfos.push(w.cepage)
+  if (w.accords_carte) shortInfos.push(w.accords_carte)
+  const shortLine = shortInfos.join(' · ')
+
+  // Y a-t-il du contenu à déplier ?
+  const hasExpandContent = !!domain?.commentaire_domaine
+
   return (
     <div
-      onClick={() => setExpanded(!expanded)}
       style={{
         background: T.deep,
         borderRadius: 14,
         border: `0.5px solid ${T.border}`,
         overflow: 'hidden',
-        cursor: 'pointer',
         transition: 'all 0.15s',
       }}
     >
@@ -55,7 +62,7 @@ export default function WineResultCard({ result }: { result: ScoredWine }) {
         </span>
       </div>
       
-      {/* Wine info — compact */}
+      {/* Wine info */}
       <div style={{ padding: '12px 14px' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
           {/* Color stripe */}
@@ -76,19 +83,6 @@ export default function WineResultCard({ result }: { result: ScoredWine }) {
             <div style={{ fontSize: 12, color: T.text2, marginTop: 2 }}>
               {typeEmoji} {w.type} · {w.region} {w.millesime ? `· ${w.millesime}` : ''}
             </div>
-            
-            {/* Commentaire client (le pitch) */}
-            {w.commentaire_client && (
-              <div style={{
-                fontSize: 12,
-                color: T.gold,
-                fontStyle: 'italic',
-                marginTop: 6,
-                lineHeight: 1.4,
-              }}>
-                « {w.commentaire_client} »
-              </div>
-            )}
           </div>
           
           {/* Prix + stock */}
@@ -107,6 +101,52 @@ export default function WineResultCard({ result }: { result: ScoredWine }) {
           </div>
         </div>
         
+        {/* Commentaire cuvée — toujours visible (c'est le pitch serveur) */}
+        {w.commentaire_cuvee && (
+          <div style={{
+            fontSize: 12,
+            color: T.gold,
+            fontStyle: 'italic',
+            marginTop: 8,
+            lineHeight: 1.5,
+            padding: '8px 10px',
+            background: `${T.gold}08`,
+            borderRadius: 8,
+          }}>
+            « {w.commentaire_cuvee} »
+          </div>
+        )}
+        
+        {/* Commentaire client (pitch carte) */}
+        {w.commentaire_client && !w.commentaire_cuvee && (
+          <div style={{
+            fontSize: 12,
+            color: T.text2,
+            fontStyle: 'italic',
+            marginTop: 8,
+            lineHeight: 1.4,
+          }}>
+            « {w.commentaire_client} »
+          </div>
+        )}
+
+        {/* Cépages + accords en ligne compacte */}
+        {shortLine && (
+          <div style={{
+            fontSize: 11,
+            color: T.muted,
+            marginTop: 8,
+            lineHeight: 1.4,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+          }}>
+            {shortLine}
+          </div>
+        )}
+        
         {/* Cert badges */}
         {certBadges.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
@@ -123,93 +163,65 @@ export default function WineResultCard({ result }: { result: ScoredWine }) {
             ))}
           </div>
         )}
-        
-        {/* Expand hint */}
-        <div style={{ 
-          fontSize: 10, 
-          color: T.muted, 
-          marginTop: 8, 
-          textAlign: 'center',
-          opacity: expanded ? 0 : 0.6,
-        }}>
-          Tap pour en savoir plus ▾
-        </div>
       </div>
       
-      {/* Expanded details */}
-      {expanded && (
-        <div style={{
-          padding: '0 14px 14px',
-          borderTop: `0.5px solid ${T.border}`,
-          marginTop: 0,
-        }}>
-          {/* Commentaire cuvée */}
-          {w.commentaire_cuvee && (
-            <div style={{
-              marginTop: 12,
-              padding: 12,
-              background: `${T.gold}0c`,
-              borderLeft: `3px solid ${T.gold}`,
-              borderRadius: '0 8px 8px 0',
-            }}>
-              <div style={{ fontSize: 11, fontWeight: 500, color: T.gold, marginBottom: 4 }}>🍷 La cuvée</div>
-              <div style={{ fontSize: 12, color: T.text, lineHeight: 1.5 }}>{w.commentaire_cuvee}</div>
-            </div>
-          )}
-          
-          {/* Commentaire domaine */}
-          {domain?.commentaire_domaine && (
-            <div style={{
-              marginTop: 10,
-              padding: 12,
-              background: T.deep,
-              border: `0.5px solid ${T.teal}30`,
-              borderRadius: 8,
-            }}>
-              <div style={{ fontSize: 11, fontWeight: 500, color: T.teal, marginBottom: 4 }}>🏠 Le domaine</div>
-              <div style={{ fontSize: 12, color: T.text2, lineHeight: 1.5 }}>{domain.commentaire_domaine}</div>
-            </div>
-          )}
-          
-          {/* Accords carte */}
-          {w.accords_carte && (
-            <div style={{
-              marginTop: 10,
-              padding: 12,
-              background: T.deep,
-              border: `0.5px solid ${T.up}20`,
-              borderRadius: 8,
-            }}>
-              <div style={{ fontSize: 11, fontWeight: 500, color: T.up, marginBottom: 4 }}>🍽️ Accords carte</div>
-              <div style={{ fontSize: 12, color: T.text2, lineHeight: 1.5 }}>{w.accords_carte}</div>
-            </div>
-          )}
-          
-          {/* Cépages */}
-          {w.cepage && (
-            <div style={{ marginTop: 10, fontSize: 12, color: T.text2 }}>
-              <span style={{ color: T.muted }}>Cépages :</span> {w.cepage}
-            </div>
-          )}
-          
-          {/* Link to full wine page */}
-          <Link
-            href={`/cave/${w.id}`}
-            onClick={(e) => e.stopPropagation()}
+      {/* Expand toggle + expanded content */}
+      {hasExpandContent && (
+        <div style={{ borderTop: `0.5px solid ${T.border}` }}>
+          <button
+            onClick={() => setExpanded(!expanded)}
             style={{
-              display: 'block',
-              marginTop: 12,
-              padding: '8px 0',
-              fontSize: 12,
+              width: '100%',
+              padding: '8px 14px',
+              fontSize: 11,
               color: T.teal,
-              textAlign: 'center',
-              textDecoration: 'none',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 4,
             }}
           >
-            Voir la fiche complète →
-          </Link>
+            {expanded ? 'Moins de détails' : 'En savoir plus sur le domaine'}
+            <span style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', fontSize: 10 }}>▾</span>
+          </button>
+          
+          {expanded && (
+            <div style={{ padding: '0 14px 14px' }}>
+              {domain?.commentaire_domaine && (
+                <div style={{
+                  padding: 10,
+                  background: `${T.teal}08`,
+                  border: `0.5px solid ${T.teal}20`,
+                  borderRadius: 8,
+                }}>
+                  <div style={{ fontSize: 11, fontWeight: 500, color: T.teal, marginBottom: 4 }}>🏠 Le domaine</div>
+                  <div style={{ fontSize: 12, color: T.text2, lineHeight: 1.5 }}>{domain.commentaire_domaine}</div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
+      
+      {/* Fiche complète link — toujours visible */}
+      <Link
+        href={`/cave/${w.id}`}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          display: 'block',
+          padding: '8px 14px',
+          fontSize: 11,
+          color: T.muted,
+          textAlign: 'center',
+          textDecoration: 'none',
+          borderTop: `0.5px solid ${T.border}`,
+        }}
+      >
+        Voir la fiche complète →
+      </Link>
     </div>
   )
 }
