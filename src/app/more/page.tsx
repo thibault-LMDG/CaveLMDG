@@ -5,6 +5,7 @@ import { T } from '@/lib/theme'
 
 const menuItems = [
   { href: '/more/sommelier', emoji: '🍷', label: 'Sommelier', desc: 'Recommandation vin pour le client', highlight: true },
+  { href: '/more/knowledge', emoji: '🧠', label: 'Fiches augmentées', desc: 'Enrichissement IA + validation', highlight: false },
   { href: '/more/agents', emoji: '📞', label: 'Fournisseurs & Agents', desc: 'Annuaire, conditions franco' },
   { href: '/more/domains', emoji: '🏠', label: 'Domaines', desc: 'Histoire, terroir et vins par domaine' },
   { href: '/more/pricing', emoji: '💰', label: 'Grille de pricing', desc: 'Coefficients et BevCost' },
