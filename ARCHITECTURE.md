@@ -1,156 +1,113 @@
-# Cave LMDG — Architecture & État du projet
-
-> Dernière mise à jour : 24/05/2026
+# Architecture Cave LMDG — 26/05/2026
 
 ## Vue d'ensemble
 
-Application web Next.js de gestion de cave pour La Marine des Goudes (Marseille).
-Mobile-first, orientée équipe de salle. Séparée du dashboard LMDG mais partage la même base Supabase.
+Application web Next.js pour la gestion de cave du restaurant La Marine des Goudes (Marseille). Mobile-first, orientée équipe de salle + interface client. Supabase backend, Vercel deployment.
 
-## Stack
+## Infrastructure
 
-| Composant | Technologie |
-|-----------|-------------|
-| Frontend | Next.js 16.x + Tailwind + inline styles |
-| Backend | Supabase (projet `unlfsgolerufpbrqwvld`) |
-| Déploiement | Vercel (`cave-lmdg`) |
-| IA | Claude API Sonnet (`claude-sonnet-4-6`) |
-| POS | SumUp/Tiller V3 (OAuth2, sync ventes + catalogue) |
-| Repo | `thibault-LMDG/CaveLMDG` |
-| Dashboard | `thibault-LMDG/Dashboard2` (Vercel `lmdg-dashboard`) |
+| Composant | Détails |
+|-----------|---------|
+| Repo | `thibault-LMDG/CaveLMDG` (GitHub) |
+| Stack | Next.js 16.x, Tailwind + inline styles, Supabase |
+| Supabase | Projet `unlfsgolerufpbrqwvld` (partagé avec dashboard LMDG) |
+| Vercel | Projet `cave-lmdg` (ID: `prj_LbBpTsGkSjKwK8NVu3SNsNCgH6tN`) |
+| Prod | `cave-lmdg.vercel.app` (branche `main`) |
+| Dev | `cave-lmdg-git-dev-thibault-s-projects1.vercel.app` (branche `dev`) |
+| API IA | Claude Sonnet `claude-sonnet-4-6` |
+| Env vars | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `ANTHROPIC_API_KEY` |
 
-## Flux de données
+## Pages & routes
 
-```
-SumUp/Tiller (caisse)
-    │
-    ├── Orders V3 (cron sync-tiller Edge Function, 4h)
-    │   ▼
-    │   commandes + lignes_produits (Supabase)
-    │
-    ├── Webhook V2 (PRODUCT_CREATED/UPDATED/DELETED)
-    │   ▼
-    │   tiller-product-webhook (Edge Function) → log sync_log
-    │
-    └── Webhook V3 (PRICEBOOK_CREATED/UPDATED/DELETED)
-        ▼
-        tiller-product-webhook (Edge Function) → cave_tiller_catalog
-
-cave_tiller_catalog (499 produits, import CSV + webhooks)
-    │
-    ▼
-cave_tiller_mapping (wine_id ↔ tiller btl + verre)
-    │
-    ▼
-/api/sync-tiller-cave (cron Vercel 4h, lookup par nom produit)
-    │ Bouteilles: -1 par vente
-    │ Verres: -1/verres_par_bouteille par verre vendu
-    ▼
-cave_stock_movements → trigger → cave_wines.quantite_stock
-```
-
-## Structure des pages
+### App cave (thème sombre, bottom nav)
 
 ```
-/cave              — Liste 79 vins + KPIs + recherche + filtres
-/cave/[id]         — Fiche vin détaillée (4 commentaires, stock, agent)
-/cave/[id]/edit    — Modification vin
-/cave/new          — Ajout vin + pricing auto + génération IA
-/stock             — Mouvements stock + entrée rapide
-/search            — Recherche globale
-/more              — Menu navigation secondaire
-/more/agents       — Liste agents fournisseurs
-/more/agents/[id]  — Fiche agent éditable
-/more/pricing      — Grille coefficients
-/more/tiller       — Mapping Tiller ↔ vins (double mapping btl/verre, auto-suggestion)
-/more/domaines     — Liste domaines + fiches détaillées
-/more/formation    — Hub Formation
-/more/formation/quiz      — Quiz individuel (2 parcours × 10 niveaux)
-/more/formation/brief     — Brief pré-service
-/more/formation/collectif — Quiz collectif pré-service
-/api/generate-comments    — POST → Claude Sonnet (cépages + commentaires)
-/api/sync-tiller-cave     — GET → sync ventes Tiller → stock btl + verres (cron)
-/api/generate-quiz        — GET → pioche questions aléatoires
-/api/generate-quiz-batch  — POST → génère questions via Claude
-/api/brief                — GET → brief pré-service
+src/app/
+├── cave/page.tsx              Liste vins + KPIs + recherche + filtres
+├── cave/[id]/page.tsx         Fiche vin complète
+├── cave/[id]/edit/page.tsx    Modification vin
+├── cave/new/page.tsx          Ajout vin + pricing auto + IA commentaires
+├── stock/page.tsx             Mouvements stock + entrée rapide
+├── search/page.tsx            Recherche globale
+├── more/page.tsx              Menu Plus
+├── more/agents/               Agents fournisseurs (CRUD)
+├── more/pricing/              Grille coefficients
+├── more/tiller/               Mapping Tiller ↔ vins
+├── more/domaines/             Liste domaines + fiches
+├── more/formation/            Hub formation (quiz, brief, collectif)
+├── more/sommelier/            Sommelier serveur (scoring client-side)
+├── more/knowledge/            Fiches augmentées (enrichissement IA + validation)
+├── more/carte/                Carte des vins preview + PDF
 ```
 
-## Sync Tiller/SumUp — Détails
+### App client (thème clair Marine, standalone)
 
-### Connexion API V3
-- OAuth2 : `https://oauth.api.tiller.systems/oauth2/token`
-- Store ID : `51992`
-- Tokens dans table `tiller_tokens` (auto-refresh)
-- Scopes : `order/read order/write` (catalog/read demandé au support)
+```
+├── sommelier-client/          Sommelier conversationnel client (QR code)
+│   ├── layout.tsx             Layout standalone (z-index 9999, pas de nav)
+│   └── page.tsx               Interface conversationnelle IA
+```
 
-### Edge Functions Supabase
-- `sync-tiller` : import orders → commandes + lignes_produits
-- `tiller-oauth` : gestion OAuth (login/callback/refresh/status)
-- `tiller-product-webhook` : webhook unifié V2 PRODUCT + V3 PRICEBOOK + ORDER_CLOSED
-- `import-tiller-catalog` : import batch CSV → cave_tiller_catalog
+### API routes
 
-### Webhooks configurés
-- **V2** (API V2 section) : PRODUCT_CREATED/UPDATED/DELETED → tiller-product-webhook
-- **V3** (API V3 section) : ORDER_CLOSED + PRICEBOOK_CREATED/UPDATED/DELETED → tiller-product-webhook
+```
+├── api/generate-comments/     Génération commentaires vin (Sonnet)
+├── api/generate-vibes/        Batch tagging profil_vibes (Sonnet)
+├── api/generate-quiz/         Pioche questions quiz (SELECT Supabase)
+├── api/generate-quiz-batch/   Génération questions quiz (Sonnet → Supabase)
+├── api/brief/                 Brief pré-service
+├── api/sommelier-ai/          Chat IA sommelier serveur
+├── api/sommelier-client/      Chat IA sommelier client (catalogue + knowledge)
+├── api/enrich-wine/           Enrichissement fiche vin (Sonnet + web search)
+├── api/sync-tiller-cave/      Sync ventes Tiller → stock
+```
 
-## Tables Supabase (préfixe cave_)
+## Schéma Supabase
 
-| Table | Rows | Rôle |
-|-------|------|------|
-| `cave_wines` | 79 | Référentiel vins (GENERATED: prix_fp_inclus, coefficient, bevcost_pct) |
-| `cave_domains` | 49 | Domaines viticoles + commentaire_domaine |
-| `cave_agents` | 11 | Agents fournisseurs |
-| `cave_stock_movements` | ~100+ | Source de vérité stock (trigger auto) |
-| `cave_pricing_grid` | 20 | Grille coefficients dégressifs |
-| `cave_tiller_mapping` | 78 | Lien produit Tiller btl + verre ↔ vin cave |
-| `cave_tiller_catalog` | 499 | Catalogue complet produits Tiller (import CSV + webhooks) |
-| `cave_quiz_questions` | ~300 | Questions quiz (15/niveau, 2 parcours × 10 niveaux) |
-| `cave_brief_push` | — | Forçage vins à pousser pour le brief |
+### Tables principales
 
-## Vues Supabase
+| Table | Rôle |
+|-------|------|
+| `cave_wines` | Vins actifs. profil_vibes text[], commentaires, accords, certifications, stock |
+| `cave_domains` | 49 domaines avec commentaire_domaine |
+| `cave_agents` | 11 agents fournisseurs |
+| `cave_stock_movements` | Source de vérité stock (trigger auto) |
+| `cave_pricing_grid` | 20 paliers coefficients dégressifs |
+| `cave_tiller_mapping` | Mapping Tiller ↔ vins (btl + verre) |
+| `cave_quiz_questions` | ~300 questions quiz (2 parcours × 10 niveaux) |
+| `cave_brief_push` | Forçage vins à pousser |
+| `cave_wine_knowledge` | Fiches enrichies IA (dégustation, terroir, pitch_serveur, anecdote, sources) |
+| `cave_tiller_catalog` | 499 produits Tiller/SumUp |
 
-| Vue | Rôle |
-|-----|------|
-| `v_cave_tiller_products` | ⚠️ OBSOLÈTE — remplacé par cave_tiller_catalog |
-| `v_cave_tiller_sales` | ⚠️ OBSOLÈTE — sync utilise lookup direct lignes_produits |
-| `v_cave_bevcost` | BevCost mensuel |
-| `v_cave_valuation` | Valorisation cave totale |
-| `v_cave_stock_dormant` | Vins sans vente > 90 jours |
+## Modules fonctionnels
 
-## Commentaires vins (4 champs)
+### Sommelier serveur (/more/sommelier)
+Flow Couleur → Style adaptatif → Budget → Occasion. Scoring client-side + bonus région LMDG. 3 picks labellés. Filtres multi-région/cépage/plat/bio. profil_vibes sur cave_wines.
 
-| Champ | Table | Description |
-|-------|-------|-------------|
-| `commentaire_domaine` | cave_domains | Histoire/terroir (partagé entre vins du domaine) |
-| `commentaire_cuvee` | cave_wines | Profil + argument de vente |
-| `accords_carte` | cave_wines | Plats actifs Tiller |
-| `commentaire_client` | cave_wines | 5-8 mots vendeurs pour carte |
+### Sommelier client (/sommelier-client)
+Standalone, design charte Marine (vert #1C5733, Luminari, Copperplate). Conversationnel IA via /api/sommelier-client. Catalogue complet + knowledge validées en contexte Sonnet. Fiche complète bottom sheet. URL QR code: cave-lmdg.vercel.app/sommelier-client
 
-## Nomenclature Tiller
+### Fiches augmentées (/more/knowledge)
+Enrichissement Sonnet + web search. Table cave_wine_knowledge. Workflow pending→enriching→ready→validated/rejected. Multi-sélection + file d'attente. Validation humaine.
 
-Format bouteille : `Domaine Cuvee - Type` (ASCII, pas d'accents)
-Format verre : `V - Domaine - Type` ou `V- Domaine - Type`
-Suffixes : Blc / BLC / Rge / Rose / Bulle / Doux / Champ
-Catégories bouteille : Blancs New / Rouges New / Rose New / Bulles New
-Catégorie verre : Vin Verre
+### Formation (/more/formation)
+Quiz individuel 2×10 niveaux, brief pré-service, quiz collectif projeté.
 
-## Env vars requises (Vercel)
+### Carte des vins (/more/carte)
+Preview HTML + PDF. Design verrouillé charte WEAREMB.
 
-| Variable | Usage |
-|----------|-------|
-| `NEXT_PUBLIC_SUPABASE_URL` | URL Supabase |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Clé anon Supabase |
-| `ANTHROPIC_API_KEY` | Claude API (génération commentaires) |
+## Design system
+
+### App cave: thème sombre nautique
+sea #0a1628, gold #e8c87a, teal #5bc4b0, typo système
+
+### App client: charte Marine
+Blanc, vert #1C5733, or #B8963E, Luminari + Copperplate, illustrations /public/sommelier/
 
 ## Conventions
 
-1. Tables préfixées `cave_` (pas de conflit avec dashboard)
-2. RLS anon pour le MVP
-3. stock_movements = source de vérité (trigger auto)
-4. Soft delete (statut = 'archive', jamais DELETE)
-5. Colonnes GENERATED en base, pas côté client
-6. Grille pricing dans pricing_grid, pas hardcodée
-7. Thème sombre nautique (theme.ts)
-8. Emojis pour icônes, pas lucide-react
-9. Push dev d'abord, merge main après validation
-10. Modèle Claude API : `claude-sonnet-4-6`
+1. Tables préfixées `cave_`, RLS anon (MVP)
+2. stock_movements = source de vérité (trigger)
+3. Modèle Claude: `claude-sonnet-4-6`
+4. Branches: dev → main. Push dev d'abord.
+5. Soft delete, jamais DELETE physique
