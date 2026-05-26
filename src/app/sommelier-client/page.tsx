@@ -64,6 +64,7 @@ interface WineBase {
   id: string
   type: string
   region: string
+  nom_appellation: string | null
   cepage: string | null
   cuvee: string | null
   millesime: string | null
@@ -278,7 +279,7 @@ export default function SommelierClientPage() {
     async function load() {
       const [{ data: kData }, { data: wData }] = await Promise.all([
         supabase.from('cave_wine_knowledge').select('*').eq('status', 'validated'),
-        supabase.from('cave_wines').select('id, type, region, cepage, cuvee, millesime, certification, sans_sulfites, cave_domains(nom)').eq('statut', 'actif').gt('quantite_stock', 0),
+        supabase.from('cave_wines').select('id, type, region, nom_appellation, cepage, cuvee, millesime, certification, sans_sulfites, cave_domains(nom)').eq('statut', 'actif').gt('quantite_stock', 0),
       ])
       const km: Record<string, KnowledgeData> = {}
       for (const k of kData || []) km[k.wine_id] = k as KnowledgeData
@@ -472,6 +473,7 @@ export default function SommelierClientPage() {
                     {msg.parsed.wines.map((wine, wi) => {
                       const isExpanded = expandedWine === `${i}-${wi}`
                       const hasKnowledge = !!knowledgeMap[wine.wine_id]
+                      const wb = wineBaseMap[wine.wine_id]
                       return (
                         <div key={wi} style={{
                           background: C.bg, border: `1px solid ${C.borderLight}`, overflow: 'hidden',
@@ -498,6 +500,17 @@ export default function SommelierClientPage() {
                                 {wine.prix}
                               </div>
                             </div>
+
+                            {/* Type · Appellation · Région */}
+                            {wb && (
+                              <div style={{
+                                fontFamily: '"Copperplate", Georgia, serif',
+                                fontSize: 9, color: C.marinePale, marginTop: 4,
+                                letterSpacing: 1, textTransform: 'uppercase',
+                              }}>
+                                {[wb.type, wb.nom_appellation || wb.region, wb.millesime].filter(Boolean).join(' · ')}
+                              </div>
+                            )}
 
                             <div style={{ fontFamily: '"Copperplate", Georgia, serif', fontSize: 11, color: C.desc, lineHeight: 1.6, marginTop: 8 }}>
                               {wine.raison}
