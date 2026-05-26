@@ -132,7 +132,7 @@ Réponds UNIQUEMENT en JSON valide, sans markdown, sans backticks :
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-opus-4-6',
+        model: 'claude-sonnet-4-6',
         max_tokens: 4000,
         tools: [
           {
@@ -211,7 +211,7 @@ Réponds UNIQUEMENT en JSON valide, sans markdown, sans backticks :
         notes_critiques: knowledge.notes_critiques || null,
         sources: sources,
         generated_at: new Date().toISOString(),
-        generation_model: 'claude-opus-4-6',
+        generation_model: 'claude-sonnet-4-6',
       }, { onConflict: 'wine_id' })
 
     if (upsertErr) {
