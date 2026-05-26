@@ -14,6 +14,7 @@ export default function SommelierClientLayout({ children }: { children: React.Re
     <div style={{
       position: 'fixed',
       inset: 0,
+      zIndex: 9999,
       overflow: 'hidden',
       background: '#FFFFFF',
       display: 'flex',
