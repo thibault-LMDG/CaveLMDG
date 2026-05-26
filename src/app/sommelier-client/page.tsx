@@ -522,7 +522,7 @@ export default function SommelierClientPage() {
         <div ref={bottomRef} style={{ height: 16 }} />
       </div>
 
-      {/* Input bar (after conversation starts) */}
+      {/* Input bar (always visible after conversation starts) */}
       {!isFirstScreen && (
         <div style={{
           padding: '10px 16px',
@@ -530,6 +530,13 @@ export default function SommelierClientPage() {
           background: C.bg,
           borderTop: `0.5px solid ${C.borderLight}`,
         }}>
+          <div style={{
+            fontFamily: 'Luminari, Georgia, serif',
+            fontSize: 10, color: C.muted, textAlign: 'center',
+            marginBottom: 6, fontStyle: 'italic',
+          }}>
+            ou tapez votre réponse librement
+          </div>
           <div style={{ display: 'flex', gap: 8, maxWidth: 480, margin: '0 auto' }}>
             <input
               type="text"
