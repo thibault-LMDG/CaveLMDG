@@ -14,8 +14,10 @@ export default function SommelierClientLayout({ children }: { children: React.Re
     <div style={{
       position: 'fixed',
       inset: 0,
-      overflow: 'auto',
-      background: '#FAF8F4',
+      overflow: 'hidden',
+      background: '#FFFFFF',
+      display: 'flex',
+      flexDirection: 'column',
     }}>
       {children}
     </div>

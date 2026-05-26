@@ -135,11 +135,12 @@ export default function SommelierClientPage() {
 
   return (
     <div style={{
-      minHeight: '100dvh',
+      height: '100%',
       background: C.bg,
       fontFamily: '"Copperplate", "Copperplate Gothic Std", "Cinzel", Georgia, serif',
       display: 'flex',
       flexDirection: 'column',
+      overflow: 'hidden',
     }}>
       {/* Font faces */}
       <style>{`
@@ -242,7 +243,7 @@ export default function SommelierClientPage() {
       </header>
 
       {/* Content */}
-      <div style={{ flex: 1, padding: '0 20px', overflowY: 'auto' }}>
+      <div style={{ flex: 1, padding: '0 20px', overflowY: 'auto', minHeight: 0 }}>
 
         {/* FIRST SCREEN */}
         {isFirstScreen && (
