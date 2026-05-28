@@ -5,12 +5,12 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { T, wineTypeColor } from '@/lib/theme'
-import type { Domain, Wine } from '@/types'
+import type { Domain, Wine, Agent } from '@/types'
 
 export default function DomainDetailPage() {
   const { id } = useParams()
   const router = useRouter()
-  const [domain, setDomain] = useState<Domain | null>(null)
+  const [domain, setDomain] = useState<(Domain & { cave_agents?: { nom: string; telephone: string | null } | null }) | null>(null)
   const [wines, setWines] = useState<Wine[]>([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
@@ -19,9 +19,9 @@ export default function DomainDetailPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: d } = await supabase.from('cave_domains').select('*').eq('id', id).single()
+      const { data: d } = await supabase.from('cave_domains').select('*, cave_agents(nom, telephone)').eq('id', id).single()
       if (!d) { router.push('/more/domains'); return }
-      setDomain(d as Domain)
+      setDomain(d as Domain & { cave_agents?: { nom: string; telephone: string | null } | null })
       setCommentaire((d as Domain).commentaire_domaine || '')
 
       const { data: w } = await supabase
@@ -76,6 +76,33 @@ export default function DomainDetailPage() {
           <div style={{ fontSize: 18, fontWeight: 500, color: inStock.length === wines.length ? T.up : T.gold, marginTop: 2 }}>{inStock.length}/{wines.length}</div>
         </div>
       </div>
+
+      {/* Agent */}
+      {domain.cave_agents && (
+        <div style={{
+          marginBottom: 16,
+          padding: '10px 14px',
+          borderRadius: 10,
+          background: T.deep,
+          border: `0.5px solid ${T.border}`,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+        }}>
+          <span style={{
+            width: 32, height: 32, borderRadius: 16, background: T.teal + '20',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 13, fontWeight: 500, color: T.teal, flexShrink: 0,
+          }}>
+            {domain.cave_agents.nom.charAt(0)}
+          </span>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 500, color: T.text }}>{domain.cave_agents.nom}</div>
+            {domain.cave_agents.telephone && <div style={{ fontSize: 11, color: T.muted }}>📞 {domain.cave_agents.telephone}</div>}
+          </div>
+          <div style={{ fontSize: 10, color: T.teal, marginLeft: 'auto' }}>Agent</div>
+        </div>
+      )}
 
       {/* Commentaire domaine */}
       <div style={{ marginBottom: 20, padding: 14, borderRadius: 10, background: T.deep, border: `0.5px solid ${T.border}` }}>

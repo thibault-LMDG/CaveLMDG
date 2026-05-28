@@ -20,6 +20,7 @@ export interface Domain {
   region: string | null
   notes: string | null
   commentaire_domaine: string | null
+  agent_id: string | null
   created_at: string
 }
 
