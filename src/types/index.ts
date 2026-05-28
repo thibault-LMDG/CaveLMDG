@@ -21,6 +21,7 @@ export interface Domain {
   notes: string | null
   commentaire_domaine: string | null
   agent_id: string | null
+  statut: string
   created_at: string
 }
 

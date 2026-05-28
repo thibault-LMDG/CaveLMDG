@@ -27,6 +27,7 @@ export default function DomainsPage() {
       const { data: domainData } = await supabase
         .from('cave_domains')
         .select('id, nom, region, commentaire_domaine')
+        .neq('statut', 'archive')
         .order('nom')
 
       if (domainData) {
