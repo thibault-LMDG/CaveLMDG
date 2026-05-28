@@ -132,6 +132,31 @@ export default function DomainsPage() {
           )}
         </>
       )}
+
+      {/* FAB — Ajouter un domaine */}
+      <Link
+        href="/more/domains/new"
+        style={{
+          position: 'fixed',
+          bottom: 76,
+          right: 20,
+          width: 52,
+          height: 52,
+          borderRadius: 26,
+          background: T.gold,
+          color: T.sea,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 26,
+          fontWeight: 300,
+          textDecoration: 'none',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+          zIndex: 30,
+        }}
+      >
+        +
+      </Link>
     </div>
   )
 }
