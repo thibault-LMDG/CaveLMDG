@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { T } from '@/lib/theme'
@@ -8,7 +8,6 @@ import type { Agent, Domain, PricingGrid, WineType } from '@/types'
 
 const WINE_TYPES: WineType[] = ['BLANC', 'ROUGE', 'ROSÉ', 'BULLE', 'DEMI-SEC']
 const APPELLATIONS = ['AOP', 'IGP', 'VDF']
-const REGIONS = ['Alsace', 'Bourgogne', 'Bordeaux', 'Champagne', 'Languedoc-Roussillon', 'Loire', 'Provence & Corse', 'Sud-Ouest', 'Vallée du Rhône', 'Vénétie']
 
 export default function NewWinePage() {
   const router = useRouter()
@@ -22,6 +21,9 @@ export default function NewWinePage() {
   const [nomAppellation, setNomAppellation] = useState('')
   const [domainId, setDomainId] = useState<string | null>(null)
   const [domainSearch, setDomainSearch] = useState('')
+  const [regionSuggestions, setRegionSuggestions] = useState<string[]>([])
+  const [showRegionDropdown, setShowRegionDropdown] = useState(false)
+  const regionRef = useRef<HTMLDivElement>(null)
   const [cuvee, setCuvee] = useState('')
   const [cepage, setCepage] = useState('')
   const [millesime, setMillesime] = useState('')
@@ -51,16 +53,30 @@ export default function NewWinePage() {
 
   useEffect(() => {
     async function load() {
-      const [{ data: a }, { data: d }, { data: p }] = await Promise.all([
+      const [{ data: a }, { data: d }, { data: p }, { data: regionData }] = await Promise.all([
         supabase.from('cave_agents').select('*').order('nom'),
-        supabase.from('cave_domains').select('*').order('nom'),
+        supabase.from('cave_domains').select('*').neq('statut', 'archive').order('nom'),
         supabase.from('cave_pricing_grid').select('*').order('prix_achat_seuil'),
+        supabase.from('cave_wines').select('region').not('region', 'is', null),
       ])
       setAgents((a as Agent[]) || [])
       setDomains((d as Domain[]) || [])
       setPricingGrid((p as PricingGrid[]) || [])
+      // Merge wine regions + domain regions for complete suggestions
+      const wineRegions = (regionData || []).map((r: { region: string }) => r.region)
+      const domainRegions = ((d as Domain[]) || []).filter(dom => dom.region).map(dom => dom.region!)
+      setRegionSuggestions([...new Set([...wineRegions, ...domainRegions])].sort())
     }
     load()
+  }, [])
+
+  // Close region dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (regionRef.current && !regionRef.current.contains(e.target as Node)) setShowRegionDropdown(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
   // Prix FDP inclus
@@ -200,13 +216,38 @@ export default function NewWinePage() {
       </div>
 
       {/* Région */}
-      <div style={{ marginBottom: 16 }}>
+      <div style={{ marginBottom: 16, position: 'relative' }} ref={regionRef}>
         <label style={labelStyle}>Région</label>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {REGIONS.map((r) => (
-            <button key={r} onClick={() => setRegion(r)} style={{ padding: '5px 10px', borderRadius: 8, fontSize: 11, border: `0.5px solid ${region === r ? T.teal + '60' : T.border}`, background: region === r ? T.teal + '18' : 'transparent', color: region === r ? T.teal : T.text2, cursor: 'pointer' }}>{r}</button>
-          ))}
-        </div>
+        <input
+          type="text"
+          value={region}
+          onChange={(e) => { setRegion(e.target.value); setShowRegionDropdown(true) }}
+          onFocus={() => setShowRegionDropdown(true)}
+          placeholder="Ex : Jura, Provence & Corse…"
+          style={inputStyle}
+        />
+        {showRegionDropdown && (() => {
+          const filtered = region
+            ? regionSuggestions.filter((r) => r.toLowerCase().includes(region.toLowerCase()))
+            : regionSuggestions
+          return filtered.length > 0 ? (
+            <div style={{
+              position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20,
+              background: T.card, border: `0.5px solid ${T.border}`, borderRadius: 10,
+              marginTop: 4, maxHeight: 200, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+            }}>
+              {filtered.map((r) => (
+                <button key={r} onClick={() => { setRegion(r); setShowRegionDropdown(false) }}
+                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', background: 'transparent', border: 'none', borderBottom: `0.5px solid ${T.border}30`, color: T.text, fontSize: 13, cursor: 'pointer' }}>
+                  {r}
+                </button>
+              ))}
+            </div>
+          ) : null
+        })()}
+        {region && !regionSuggestions.includes(region) && region.trim().length > 1 && (
+          <div style={{ fontSize: 11, color: T.blue, marginTop: 4 }}>✨ Nouvelle région — sera créée automatiquement</div>
+        )}
       </div>
 
       {/* Appellation */}
