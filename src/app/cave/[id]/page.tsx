@@ -124,9 +124,24 @@ export default function WineDetailPage() {
           }}>
             {wine.quantite_stock} btl
           </div>
-          <div style={{ fontSize: 10, color: T.muted }}>min {wine.stock_minimum}</div>
+          <div style={{ fontSize: 10, color: T.muted }}>seuil {wine.stock_critique} · cmd {wine.commande_standard}</div>
         </div>
       </div>
+
+      {/* Alerte réappro */}
+      {wine.quantite_stock <= wine.stock_critique && wine.quantite_stock >= 0 && (
+        <div style={{
+          margin: '0 16px 12px', padding: '10px 14px', borderRadius: 10,
+          background: T.down + '12', border: `0.5px solid ${T.down}30`,
+          display: 'flex', alignItems: 'center', gap: 8,
+        }}>
+          <span style={{ fontSize: 14 }}>📦</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 12, color: T.down, fontWeight: 500 }}>Stock critique atteint</div>
+            <div style={{ fontSize: 11, color: T.muted, marginTop: 1 }}>Commander {wine.commande_standard} btl</div>
+          </div>
+        </div>
+      )}
 
       {/* Grille métadonnées */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '0 16px 16px' }}>

@@ -47,6 +47,8 @@ export default function EditWinePage() {
   const [prixVerre, setPrixVerre] = useState('')
   const [verresParBouteille, setVerresParBouteille] = useState('6')
   const [stockMinimum, setStockMinimum] = useState('3')
+  const [stockCritique, setStockCritique] = useState('3')
+  const [commandeStandard, setCommandeStandard] = useState('6')
   const [emplacement, setEmplacement] = useState('')
 
   useEffect(() => {
@@ -92,6 +94,8 @@ export default function EditWinePage() {
       setPrixVerre(wine.prix_verre?.toString() || '')
       setVerresParBouteille(wine.verres_par_bouteille?.toString() || '6')
       setStockMinimum(wine.stock_minimum?.toString() || '3')
+      setStockCritique(wine.stock_critique?.toString() || '3')
+      setCommandeStandard(wine.commande_standard?.toString() || '6')
       setEmplacement(wine.emplacement || '')
       setLoading(false)
     }
@@ -123,6 +127,7 @@ export default function EditWinePage() {
       commentaire_client: commentaireClient.trim() || null,
       accords_carte: accordsCarte.trim() || null,
       au_verre: auVerre, prix_verre: auVerre && prixVerre ? parseFloat(prixVerre) : null, verres_par_bouteille: parseInt(verresParBouteille) || 6, stock_minimum: parseInt(stockMinimum) || 3,
+      stock_critique: parseInt(stockCritique) || 3, commande_standard: parseInt(commandeStandard) || 6,
       emplacement: emplacement.trim() || null,
     }).eq('id', id)
     if (err) { setError('Erreur : ' + err.message); setSaving(false) }
@@ -267,6 +272,16 @@ export default function EditWinePage() {
           <label style={labelStyle}>Stock minimum</label>
           <input type="number" value={stockMinimum} onChange={(e) => setStockMinimum(e.target.value)} style={inputStyle} />
         </div>
+        <div style={{ flex: 1 }}>
+          <label style={labelStyle}>Seuil critique</label>
+          <input type="number" value={stockCritique} onChange={(e) => setStockCritique(e.target.value)} style={inputStyle} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <label style={labelStyle}>Cmd standard</label>
+          <input type="number" value={commandeStandard} onChange={(e) => setCommandeStandard(e.target.value)} step="6" style={inputStyle} />
+        </div>
+      </div>
+      <div style={rowStyle}>
         <div style={{ flex: 1 }}>
           <label style={labelStyle}>Emplacement</label>
           <input type="text" value={emplacement} onChange={(e) => setEmplacement(e.target.value)} placeholder="ex: B3" style={inputStyle} />

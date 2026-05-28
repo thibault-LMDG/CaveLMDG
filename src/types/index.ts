@@ -43,6 +43,8 @@ export interface Wine {
   bevcost_pct: number | null // GENERATED
   quantite_stock: number
   stock_minimum: number
+  stock_critique: number
+  commande_standard: number
   emplacement: string | null
   statut: WineStatus
   au_verre: boolean
