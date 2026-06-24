@@ -50,6 +50,8 @@ export default function NewWinePage() {
   const [newDomainNom, setNewDomainNom] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [pushSumup, setPushSumup] = useState(true)
+  const [sumupMsg, setSumupMsg] = useState('')
 
   useEffect(() => {
     async function load() {
@@ -193,8 +195,28 @@ export default function NewWinePage() {
       commentaire_cuvee: commentaireCuvee.trim() || null,
       accords_carte: accordsCarte.trim() || null,
     }).select().single()
-    if (err) { setError('Erreur : ' + err.message); setSaving(false) }
-    else if (data) { router.push(`/cave/${data.id}`) }
+    if (err) { setError('Erreur : ' + err.message); setSaving(false); return }
+    if (!data) { setSaving(false); return }
+
+    // Optionnel : créer le produit dans SumUp (caisse) et le lier au vin (auto-mapping)
+    if (pushSumup) {
+      setSumupMsg('Création dans SumUp + liaison… (~10 s)')
+      const colMap: Record<string, string> = { BLANC: 'Blc', ROUGE: 'Rge', 'ROSÉ': 'Rose', BULLE: 'Bulle', 'DEMI-SEC': 'Blc' }
+      const domaineNom = domains.find((d) => d.id === domainId)?.nom || ''
+      const coreName = [domaineNom, cuvee.trim()].filter(Boolean).join(' ')
+      const sumupName = `${coreName} - ${colMap[type] || ''}`.trim()
+      try {
+        const resp = await fetch('https://unlfsgolerufpbrqwvld.supabase.co/functions/v1/cave-create-product', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ wine_id: data.id, name: sumupName, price: parseFloat(prixVente) }),
+        })
+        const res = await resp.json()
+        if (res.ok) setSumupMsg(res.mapped ? '✅ Créé dans SumUp et lié au stock' : '✅ Créé dans SumUp (liaison en cours…)')
+        else if (res.reason === 'session_expired' || res.reason === 'no_session') setSumupMsg('⚠️ Session SumUp à rafraîchir — vin enregistré, mais pas créé en caisse')
+        else setSumupMsg('⚠️ SumUp : ' + (res.reason || 'échec') + ' — vin enregistré')
+      } catch { setSumupMsg('⚠️ SumUp injoignable — vin enregistré') }
+    }
+    router.push(`/cave/${data.id}`)
   }
 
   const inputStyle = { width: '100%', padding: '10px 14px', borderRadius: 8, border: `0.5px solid ${T.border}`, background: T.sea, color: T.text, fontSize: 14, outline: 'none' }
@@ -503,10 +525,16 @@ export default function NewWinePage() {
         </div>
       </div>
 
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, fontSize: 13, color: T.text2, cursor: 'pointer' }}>
+        <input type="checkbox" checked={pushSumup} onChange={(e) => setPushSumup(e.target.checked)} />
+        ➕ Créer aussi dans SumUp (caisse) et lier au stock
+      </label>
+
       {error && <div style={{ fontSize: 13, color: T.rose, marginBottom: 12, textAlign: 'center' }}>{error}</div>}
+      {sumupMsg && <div style={{ fontSize: 13, color: T.teal, marginBottom: 12, textAlign: 'center' }}>{sumupMsg}</div>}
 
       <button onClick={handleSubmit} disabled={saving} style={{ width: '100%', padding: '16px 0', borderRadius: 10, border: 'none', background: T.gold, color: T.sea, fontSize: 16, fontWeight: 500, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.5 : 1, position: 'sticky' as const, bottom: 72 }}>
-        {saving ? 'Enregistrement…' : 'Ajouter le vin'}
+        {saving ? (pushSumup ? 'Enregistrement + SumUp…' : 'Enregistrement…') : 'Ajouter le vin'}
       </button>
     </div>
   )
