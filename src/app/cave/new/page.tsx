@@ -202,19 +202,24 @@ export default function NewWinePage() {
     if (pushSumup) {
       setSumupMsg('Création dans SumUp + liaison… (~10 s)')
       const colMap: Record<string, string> = { BLANC: 'Blc', ROUGE: 'Rge', 'ROSÉ': 'Rose', BULLE: 'Bulle', 'DEMI-SEC': 'Blc' }
+      const catMap: Record<string, string> = { BLANC: 'Blancs New', ROUGE: 'Rouges New', 'ROSÉ': 'Rose New', BULLE: 'Bulles New', 'DEMI-SEC': 'Blancs New' }
       const domaineNom = domains.find((d) => d.id === domainId)?.nom || ''
       const coreName = [domaineNom, cuvee.trim()].filter(Boolean).join(' ')
       const sumupName = `${coreName} - ${colMap[type] || ''}`.trim()
       try {
         const resp = await fetch('https://unlfsgolerufpbrqwvld.supabase.co/functions/v1/cave-create-product', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ wine_id: data.id, name: sumupName, price: parseFloat(prixVente) }),
+          body: JSON.stringify({ wine_id: data.id, name: sumupName, price: parseFloat(prixVente), category_name: catMap[type] || 'Blancs New' }),
         })
         const res = await resp.json()
-        if (res.ok) setSumupMsg(res.mapped ? '✅ Créé dans SumUp et lié au stock' : '✅ Créé dans SumUp (liaison en cours…)')
-        else if (res.reason === 'session_expired' || res.reason === 'no_session') setSumupMsg('⚠️ Session SumUp à rafraîchir — vin enregistré, mais pas créé en caisse')
-        else setSumupMsg('⚠️ SumUp : ' + (res.reason || 'échec') + ' — vin enregistré')
-      } catch { setSumupMsg('⚠️ SumUp injoignable — vin enregistré') }
+        if (res.ok && res.mapped) { router.push(`/cave/${data.id}`); return }
+        if (res.ok) { setSumupMsg('⚠️ Créé en caisse, mais liaison au stock non confirmée — vérifie dans Plus → Mapping Tiller.'); setSaving(false); return }
+        if (res.reason === 'session_expired' || res.reason === 'no_session') setSumupMsg('❌ Session SumUp expirée — vin enregistré mais NON créé en caisse. Préviens un admin pour rafraîchir la session.')
+        else if (res.reason === 'category_not_found') setSumupMsg('❌ Catégorie SumUp introuvable (' + (res.categoryName || '') + ') — vin enregistré, pas créé en caisse.')
+        else if (res.reason === 'validation_error') setSumupMsg('❌ SumUp a refusé : ' + (res.errors || []).join(', ') + ' — vin enregistré, pas en caisse.')
+        else setSumupMsg('❌ Échec création SumUp (' + (res.reason || '?') + ') — vin enregistré, pas en caisse.')
+        setSaving(false); return
+      } catch { setSumupMsg('❌ SumUp injoignable — vin enregistré, pas en caisse.'); setSaving(false); return }
     }
     router.push(`/cave/${data.id}`)
   }

@@ -180,6 +180,29 @@ export default function TillerMappingPage() {
     loadData()
   }
 
+  // Crée un vin de la cave EN CAISSE SumUp (pour un vin pas encore présent), puis l'auto-lie
+  async function pushWineToSumup(wine: WineWithDomain) {
+    setSaving(true)
+    const colMap: Record<string, string> = { BLANC: 'Blc', ROUGE: 'Rge', 'ROSÉ': 'Rose', BULLE: 'Bulle', 'DEMI-SEC': 'Blc' }
+    const catMap: Record<string, string> = { BLANC: 'Blancs New', ROUGE: 'Rouges New', 'ROSÉ': 'Rose New', BULLE: 'Bulles New', 'DEMI-SEC': 'Blancs New' }
+    const core = [wine.cave_domains?.nom, wine.cuvee].filter(Boolean).join(' ')
+    const name = `${core} - ${colMap[wine.type] || ''}`.trim()
+    try {
+      const resp = await fetch('https://unlfsgolerufpbrqwvld.supabase.co/functions/v1/cave-create-product', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wine_id: wine.id, name, price: wine.prix_vente, category_name: catMap[wine.type] || 'Blancs New' }),
+      })
+      const res = await resp.json()
+      if (res.ok && res.mapped) alert('✅ « ' + name +' » créé en caisse et lié au stock')
+      else if (res.ok) alert('⚠️ Créé en caisse mais liaison non confirmée — relie manuellement si besoin')
+      else if (res.reason === 'session_expired' || res.reason === 'no_session') alert('❌ Session SumUp expirée — préviens un admin pour la rafraîchir')
+      else if (res.reason === 'category_not_found') alert('❌ Catégorie SumUp introuvable (' + (res.categoryName || '') + ')')
+      else if (res.reason === 'validation_error') alert('❌ SumUp a refusé : ' + (res.errors || []).join(', '))
+      else alert('❌ Échec création SumUp (' + (res.reason || '?') + ')')
+    } catch { alert('❌ SumUp injoignable') }
+    setSaving(false); loadData()
+  }
+
   const typeEmoji: Record<string, string> = { BLANC: '⚪', ROUGE: '🔴', ROSÉ: '🩷', BULLE: '🫧', 'DEMI-SEC': '🍯' }
 
   return (
@@ -280,6 +303,16 @@ export default function TillerMappingPage() {
                       </div>
                       <button onClick={(e) => { e.stopPropagation(); mapProduct(wine.id, suggestion.product, 'btl') }} disabled={saving}
                         style={{ padding: '4px 12px', borderRadius: 8, fontSize: 11, fontWeight: 500, background: T.gold + '20', border: `0.5px solid ${T.gold}40`, color: T.gold, cursor: 'pointer' }}>Lier</button>
+                    </div>
+                  )}
+
+                  {/* Créer ce vin dans SumUp (caisse) — pour un vin pas encore en caisse */}
+                  {!isEditing && !mapping && (
+                    <div style={{ marginTop: 8 }}>
+                      <button onClick={(e) => { e.stopPropagation(); pushWineToSumup(wine) }} disabled={saving}
+                        style={{ padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 500, background: T.teal + '18', border: `0.5px solid ${T.teal}40`, color: T.teal, cursor: saving ? 'wait' : 'pointer' }}>
+                        ➕ Créer ce vin dans SumUp (caisse)
+                      </button>
                     </div>
                   )}
 

@@ -33,11 +33,21 @@ function firstOption(html: string, sel: string): string {
   return opts[0] || "";
 }
 
+// Résout la value d'une option par son libellé (ex. catégorie "Blancs New", featureType "BEV").
+function optionByText(html: string, sel: string, text: string): string {
+  const block = html.match(new RegExp(`<select[^>]*name="product\\[${sel}\\]".*?</select>`, "is"));
+  if (!block) return "";
+  for (const m of block[0].matchAll(/<option[^>]*value="([^"]*)"[^>]*>([\s\S]*?)<\/option>/gi)) {
+    if (m[2].replace(/<[^>]+>/g, "").trim().toLowerCase() === text.toLowerCase()) return m[1];
+  }
+  return "";
+}
+
 // === LE SEUL bloc à remplacer le jour où on a l'API catalog/write ===
-async function createInSumUp(session: string, p: { name: string; price: number; category: string; color: string; costPrice: number }) {
+async function createInSumUp(session: string, p: { name: string; price: number; categoryName: string; color: string; costPrice: number }) {
   const cookie = `PHPSESSID=${session}`;
-  // 1) formulaire de création -> token CSRF + valeurs par défaut des selects
-  const formRes = await fetch(`${V2WEB}/product/new/popin?category=${encodeURIComponent(p.category)}`, {
+  // 1) formulaire de création -> token CSRF + libellés/ids des selects (on charge avec une catégorie valide quelconque)
+  const formRes = await fetch(`${V2WEB}/product/new/popin?category=5187020`, {
     headers: { Cookie: cookie, "User-Agent": UA, "X-Requested-With": "XMLHttpRequest" },
   });
   const formHtml = await formRes.text();
@@ -46,14 +56,18 @@ async function createInSumUp(session: string, p: { name: string; price: number; 
   }
   const tokenM = formHtml.match(/name="product\[_token\]"\s+value="([^"]+)"/);
   if (!tokenM) return { ok: false, reason: "no_csrf_token" };
+  // Catégorie résolue par son NOM (jamais EAU par défaut)
+  const categoryId = optionByText(formHtml, "category", p.categoryName);
+  if (!categoryId) return { ok: false, reason: "category_not_found", categoryName: p.categoryName };
+  const featureBev = optionByText(formHtml, "featureType", "BEV") || "94559";
   const fields: Record<string, string> = {
     "product[name]": p.name, "product[sku]": "", "product[color]": p.color,
     "product[price]": String(p.price), "product[costPrice]": String(p.costPrice),
     "product[terminalName]": p.name,
-    "product[category]": p.category,
+    "product[category]": categoryId,
     "product[tax]": firstOption(formHtml, "tax"),
-    "product[featureType]": firstOption(formHtml, "featureType"),
-    "product[unitMeasure]": firstOption(formHtml, "unitMeasure"),
+    "product[featureType]": featureBev,              // BEV (boisson), pas FOOD
+    // unitMeasure volontairement omis -> pas de "produit à la pesée", prix fixe
     "product[printer]": firstOption(formHtml, "printer"),
     "product[printer2]": firstOption(formHtml, "printer2"),
     "product[description]": "", "product[terminalDescription]": "",
@@ -88,9 +102,10 @@ serve(async (req) => {
       name,
       price: Number(b.price || 0),                  // le formulaire back-office attend des EUROS
       costPrice: Number(b.costPrice || 0),
-      category: String(b.category || "4740004"),    // défaut : catégorie courante
+      categoryName: String(b.category_name || ""),  // ex. "Blancs New" — résolu en id côté fonction
       color: b.color || "#2AB688",
     };
+    if (!params.categoryName) return new Response(JSON.stringify({ ok: false, reason: "missing_category" }), { status: 400, headers: cors });
     const r = await createInSumUp(session, params);
 
     // Auto-mapping : si wine_id fourni, on attend que le webhook synchronise le produit,
