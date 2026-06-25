@@ -52,6 +52,10 @@ export default function NewWinePage() {
   const [error, setError] = useState('')
   const [pushSumup, setPushSumup] = useState(true)
   const [sumupMsg, setSumupMsg] = useState('')
+  const [recovery, setRecovery] = useState<null | { wineId: string; name: string; categoryName: string; price: number; error: string }>(null)
+  const [verifying, setVerifying] = useState(false)
+  const [verifyIssues, setVerifyIssues] = useState<string[]>([])
+  const [verifyDone, setVerifyDone] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -213,15 +217,35 @@ export default function NewWinePage() {
         })
         const res = await resp.json()
         if (res.ok && res.mapped) { router.push(`/cave/${data.id}`); return }
-        if (res.ok) { setSumupMsg('⚠️ Créé en caisse, mais liaison au stock non confirmée — vérifie dans Plus → Mapping Tiller.'); setSaving(false); return }
-        if (res.reason === 'session_expired' || res.reason === 'no_session') setSumupMsg('❌ Session SumUp expirée — vin enregistré mais NON créé en caisse. Préviens un admin pour rafraîchir la session.')
-        else if (res.reason === 'category_not_found') setSumupMsg('❌ Catégorie SumUp introuvable (' + (res.categoryName || '') + ') — vin enregistré, pas créé en caisse.')
-        else if (res.reason === 'validation_error') setSumupMsg('❌ SumUp a refusé : ' + (res.errors || []).join(', ') + ' — vin enregistré, pas en caisse.')
-        else setSumupMsg('❌ Échec création SumUp (' + (res.reason || '?') + ') — vin enregistré, pas en caisse.')
-        setSaving(false); return
-      } catch { setSumupMsg('❌ SumUp injoignable — vin enregistré, pas en caisse.'); setSaving(false); return }
+        // Échec (ou liaison non confirmée) -> assistant de récupération guidé
+        const errLabel = (res.reason === 'session_expired' || res.reason === 'no_session') ? "La session caisse a expiré — la création automatique n'a pas pu se faire."
+          : res.reason === 'category_not_found' ? "Catégorie SumUp introuvable (" + (res.categoryName || '') + ")."
+          : res.reason === 'validation_error' ? "SumUp a refusé : " + (res.errors || []).join(', ')
+          : res.ok ? "Le produit semble créé, mais la liaison au stock n'a pas été confirmée."
+          : "L'import automatique en caisse n'a pas marché."
+        setRecovery({ wineId: data.id, name: sumupName, categoryName: catMap[type] || 'Blancs New', price: parseFloat(prixVente), error: errLabel })
+        setVerifyIssues([]); setVerifyDone(false); setSaving(false); return
+      } catch {
+        setRecovery({ wineId: data.id, name: sumupName, categoryName: catMap[type] || 'Blancs New', price: parseFloat(prixVente), error: "SumUp était injoignable pour la création automatique." })
+        setVerifyIssues([]); setVerifyDone(false); setSaving(false); return
+      }
     }
     router.push(`/cave/${data.id}`)
+  }
+
+  async function verifyRecovery() {
+    if (!recovery) return
+    setVerifying(true); setVerifyIssues([])
+    try {
+      const resp = await fetch('https://unlfsgolerufpbrqwvld.supabase.co/functions/v1/cave-verify-product', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wine_id: recovery.wineId, name: recovery.name, price: recovery.price, category_name: recovery.categoryName }),
+      })
+      const res = await resp.json()
+      if (res.ok) setVerifyDone(true)
+      else setVerifyIssues(res.issues && res.issues.length ? res.issues : ['Vérification impossible — réessaie dans quelques secondes.'])
+    } catch { setVerifyIssues(['Vérification injoignable — réessaie.']) }
+    setVerifying(false)
   }
 
   const inputStyle = { width: '100%', padding: '10px 14px', borderRadius: 8, border: `0.5px solid ${T.border}`, background: T.sea, color: T.text, fontSize: 14, outline: 'none' }
@@ -541,6 +565,50 @@ export default function NewWinePage() {
       <button onClick={handleSubmit} disabled={saving} style={{ width: '100%', padding: '16px 0', borderRadius: 10, border: 'none', background: T.gold, color: T.sea, fontSize: 16, fontWeight: 500, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.5 : 1, position: 'sticky' as const, bottom: 72 }}>
         {saving ? (pushSumup ? 'Enregistrement + SumUp…' : 'Enregistrement…') : 'Ajouter le vin'}
       </button>
+
+      {recovery && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(4,12,24,0.85)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ background: T.card, borderRadius: 14, border: `0.5px solid ${T.border}`, maxWidth: 470, width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: 20 }}>
+            {verifyDone ? (
+              <>
+                <div style={{ fontSize: 18, fontWeight: 600, color: T.up, marginBottom: 8 }}>🎉 Bravo, c&apos;est tout bon !</div>
+                <div style={{ fontSize: 14, color: T.text2, marginBottom: 18, lineHeight: 1.5 }}>Le vin est en caisse, conforme (catégorie, prix, TVA) et lié au stock. Tout est synchronisé.</div>
+                <button onClick={() => router.push(`/cave/${recovery.wineId}`)} style={{ width: '100%', padding: '14px 0', borderRadius: 10, border: 'none', background: T.up, color: T.sea, fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>Terminer</button>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 17, fontWeight: 600, color: T.gold, marginBottom: 6 }}>🛟 Ajout en caisse à finaliser</div>
+                <div style={{ fontSize: 13, color: T.rose, marginBottom: 14, lineHeight: 1.5 }}>{recovery.error} Pas de panique, on le fait ensemble 👇</div>
+                <div style={{ fontSize: 13, color: T.text2, lineHeight: 1.8 }}>
+                  <div style={{ fontWeight: 600, color: T.text, marginBottom: 4 }}>Dans la caisse SumUp :</div>
+                  1. <b>Produits → Ajouter un produit</b><br />
+                  2. Catégorie : <b style={{ color: T.teal }}>{recovery.categoryName}</b><br />
+                  3. Nom (clique pour copier, colle exactement) :
+                </div>
+                <div onClick={() => navigator.clipboard?.writeText(recovery.name)} style={{ margin: '6px 0 10px', padding: '9px 11px', background: T.sea, border: `0.5px solid ${T.border}`, borderRadius: 8, color: T.gold, fontSize: 13, cursor: 'copy', wordBreak: 'break-word' }}>📋 {recovery.name}</div>
+                <div style={{ fontSize: 13, color: T.text2, lineHeight: 1.8, marginBottom: 14 }}>
+                  4. Prix TTC : <b style={{ color: T.teal }}>{recovery.price} €</b><br />
+                  5. TVA : <b style={{ color: T.teal }}>20 %</b> · Type : <b style={{ color: T.teal }}>BEV</b><br />
+                  6. Imprimante : <b style={{ color: T.teal }}>BAR</b> (secondaire : vide)<br />
+                  7. <b>Décoche</b> « produit à la pesée »<br />
+                  8. <b>Valide</b> le produit.
+                </div>
+                {verifyIssues.length > 0 && (
+                  <div style={{ background: T.rose + '14', border: `0.5px solid ${T.rose}40`, borderRadius: 8, padding: '10px 12px', marginBottom: 12 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: T.rose, marginBottom: 4 }}>⚠️ Pas encore conforme :</div>
+                    {verifyIssues.map((iss, i) => <div key={i} style={{ fontSize: 12, color: T.rose, marginBottom: 2 }}>• {iss}</div>)}
+                    <div style={{ fontSize: 12, color: T.text2, marginTop: 4 }}>Corrige dans SumUp, puis re-clique sur OK.</div>
+                  </div>
+                )}
+                <button onClick={verifyRecovery} disabled={verifying} style={{ width: '100%', padding: '14px 0', borderRadius: 10, border: 'none', background: T.gold, color: T.sea, fontSize: 15, fontWeight: 600, cursor: verifying ? 'wait' : 'pointer', opacity: verifying ? 0.6 : 1 }}>
+                  {verifying ? '⏳ Vérification en cours…' : '✅ OK, j\'ai ajouté le produit'}
+                </button>
+                <button onClick={() => router.push(`/cave/${recovery.wineId}`)} style={{ width: '100%', padding: '10px 0', marginTop: 8, background: 'none', border: 'none', color: T.muted, fontSize: 12, cursor: 'pointer' }}>Plus tard (vin enregistré, mais pas en caisse)</button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -65,11 +65,11 @@ async function createInSumUp(session: string, p: { name: string; price: number; 
     "product[price]": String(p.price), "product[costPrice]": String(p.costPrice),
     "product[terminalName]": p.name,
     "product[category]": categoryId,
-    "product[tax]": firstOption(formHtml, "tax"),
+    "product[tax]": optionByText(formHtml, "tax", "20% (20.00%)") || "210388",   // vin = alcool = TVA 20%
     "product[featureType]": featureBev,              // BEV (boisson), pas FOOD
     // unitMeasure volontairement omis -> pas de "produit à la pesée", prix fixe
-    "product[printer]": firstOption(formHtml, "printer"),
-    "product[printer2]": firstOption(formHtml, "printer2"),
+    "product[printer]": optionByText(formHtml, "printer", "BAR") || "109241",     // imprimante BAR en principale
+    // product[printer2] volontairement omis -> aucune imprimante secondaire
     "product[description]": "", "product[terminalDescription]": "",
     "product[_token]": tokenM[1],
   };
