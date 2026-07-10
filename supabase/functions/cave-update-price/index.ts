@@ -89,9 +89,10 @@ serve(async (req) => {
     const fieldNames = Object.keys(fields);
 
     if (dryRun) {
+      const snapshot = Object.fromEntries(Object.entries(fields).filter(([k]) => k !== "product[_token]"));
       return new Response(JSON.stringify({
         ok: true, dryRun: true, session_valid: true, edit_path: form.path, final_url: form.url,
-        action, current_price: currentPrice, field_names: fieldNames,
+        action, current_price: currentPrice, field_names: fieldNames, snapshot,
         has_token: !!fields["product[_token]"], has_category: !!fields["product[category]"],
         has_tax: !!fields["product[tax]"], has_printer: !!fields["product[printer]"],
       }, null, 2), { status: 200, headers: cors });
@@ -102,7 +103,10 @@ serve(async (req) => {
 
     const before = currentPrice;
     fields["product[price]"] = String(price);
-    const body = Object.entries(fields).map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join("&");
+    // On ne renvoie pas les champs fichier/média (upload) — sinon risque d'effacer l'image.
+    const body = Object.entries(fields)
+      .filter(([k]) => !k.includes("[media]") && !k.endsWith("[file]"))
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join("&");
     const actionUrl = action.startsWith("http") ? action : `${V2WEB}${action}`;
     const res = await fetch(actionUrl, {
       method: "POST", redirect: "manual",
