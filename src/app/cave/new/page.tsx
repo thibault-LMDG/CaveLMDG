@@ -88,24 +88,25 @@ export default function NewWinePage() {
   // Prix FDP inclus
   const prixFpInclus = (parseFloat(prixAchat) || 0) + (parseFloat(fraisPort) || 0)
 
-  // Prix suggéré via interpolation de la grille
+  // Prix suggéré = PA HT (port inclus) × coef HT (grille) × 1,20 (TVA 20% vin).
+  // La grille stocke un coef HT (PV_HT/PA_HT) → il FAUT le ×1,20 pour obtenir le PV TTC de carte.
   const prixSuggere = useMemo(() => {
     if (prixFpInclus <= 0 || pricingGrid.length === 0) return null
     const grid = pricingGrid
     // Sous le premier palier
     if (prixFpInclus <= grid[0].prix_achat_seuil) {
-      return Math.round(prixFpInclus * grid[0].coefficient)
+      return Math.round(prixFpInclus * grid[0].coefficient * 1.2)
     }
     // Au-dessus du dernier palier
     if (prixFpInclus >= grid[grid.length - 1].prix_achat_seuil) {
-      return Math.round(prixFpInclus * grid[grid.length - 1].coefficient)
+      return Math.round(prixFpInclus * grid[grid.length - 1].coefficient * 1.2)
     }
     // Interpolation entre deux paliers
     for (let i = 0; i < grid.length - 1; i++) {
       if (prixFpInclus >= grid[i].prix_achat_seuil && prixFpInclus < grid[i + 1].prix_achat_seuil) {
         const ratio = (prixFpInclus - grid[i].prix_achat_seuil) / (grid[i + 1].prix_achat_seuil - grid[i].prix_achat_seuil)
         const coef = grid[i].coefficient + ratio * (grid[i + 1].coefficient - grid[i].coefficient)
-        return Math.round(prixFpInclus * coef)
+        return Math.round(prixFpInclus * coef * 1.2)
       }
     }
     return null
@@ -118,10 +119,11 @@ export default function NewWinePage() {
     }
   }, [prixSuggere, prixForce])
 
+  // Coef & BevCost affichés en HT/HT : PV HT = PV TTC / 1,20 (TVA 20% vin)
   const coeffActuel = prixFpInclus > 0 && parseFloat(prixVente) > 0
-    ? (parseFloat(prixVente) / prixFpInclus).toFixed(2) : null
+    ? ((parseFloat(prixVente) / 1.2) / prixFpInclus).toFixed(2) : null
   const bevcostActuel = parseFloat(prixVente) > 0 && prixFpInclus > 0
-    ? ((prixFpInclus / parseFloat(prixVente)) * 100).toFixed(1) + '%' : null
+    ? ((prixFpInclus / (parseFloat(prixVente) / 1.2)) * 100).toFixed(1) + '%' : null
 
   // Palier de grille correspondant
   const palierActuel = useMemo(() => {
