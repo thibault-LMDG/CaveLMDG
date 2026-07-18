@@ -2,16 +2,17 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 /**
- * Met à jour le PRIX d'un produit existant dans SumUp/Tiller DEPUIS l'app Cave.
+ * Met à jour le PRIX et/ou le NOM d'un produit existant dans SumUp/Tiller DEPUIS l'app Cave.
  *
  * Même tuyauterie intérimaire que cave-create-product : l'API SumUp est read-only sur le
  * catalogue, donc on passe par le formulaire web du back-office (édition produit),
  * authentifié par la session PHPSESSID (tiller_tokens id='web_session').
  *
  * Stratégie SÛRE : on récupère le formulaire d'édition du produit, on renvoie TOUS ses
- * champs tels quels en ne modifiant QUE product[price] (préserve catégorie/TVA/imprimante/…).
+ * champs tels quels en ne modifiant QUE les champs demandés (préserve catégorie/TVA/imprimante/…).
  *
- * POST body JSON: { tiller_product_id, price, dryRun? }
+ * POST body JSON: { tiller_product_id, price?, name?, dryRun? }  (au moins price ou name)
+ *   name  -> renomme aussi product[terminalName] s'il était identique à l'ancien nom.
  *   dryRun=true  -> inspecte (session + structure du form) sans rien soumettre.
  */
 const V2WEB = "https://app.tillersystems.com";
@@ -77,9 +78,10 @@ serve(async (req) => {
     const b = req.method === "POST" ? await req.json().catch(() => ({})) : {};
     const id = Number(b.tiller_product_id || 0);
     const price = Number(b.price);
+    const newName = typeof b.name === "string" ? b.name.trim() : "";
     const dryRun = !!b.dryRun;
     if (!id) return new Response(JSON.stringify({ ok: false, reason: "missing_tiller_product_id" }), { status: 400, headers: cors });
-    if (!dryRun && !(price > 0)) return new Response(JSON.stringify({ ok: false, reason: "missing_price" }), { status: 400, headers: cors });
+    if (!dryRun && !(price > 0) && !newName) return new Response(JSON.stringify({ ok: false, reason: "missing_price_or_name" }), { status: 400, headers: cors });
 
     const form = await fetchEditForm(session, id);
     if (!form.ok) return new Response(JSON.stringify(form), { status: form.reason === "session_expired" ? 503 : 422, headers: cors });
@@ -102,7 +104,13 @@ serve(async (req) => {
     if (!action) return new Response(JSON.stringify({ ok: false, reason: "no_form_action" }), { status: 422, headers: cors });
 
     const before = currentPrice;
-    fields["product[price]"] = String(price);
+    const nameBefore = fields["product[name]"];
+    if (price > 0) fields["product[price]"] = String(price);
+    if (newName) {
+      // terminalName suit le nom s'il était identique (comportement de la création)
+      if (fields["product[terminalName]"] === fields["product[name]"]) fields["product[terminalName]"] = newName;
+      fields["product[name]"] = newName;
+    }
     // On ne renvoie pas les champs fichier/média (upload) — sinon risque d'effacer l'image.
     const body = Object.entries(fields)
       .filter(([k]) => !k.includes("[media]") && !k.endsWith("[file]"))
@@ -118,7 +126,7 @@ serve(async (req) => {
       const errs = [...txt.matchAll(/(?:has-error|help-block|invalid-feedback)[^>]*>([^<]{2,80})/g)].map((m) => m[1].trim());
       return new Response(JSON.stringify({ ok: false, reason: "validation_error", errors: errs.slice(0, 6), price_before: before }), { status: 422, headers: cors });
     }
-    return new Response(JSON.stringify({ ok: true, tiller_product_id: id, price_before: before, price_after: price, status: res.status }, null, 2), { status: 200, headers: cors });
+    return new Response(JSON.stringify({ ok: true, tiller_product_id: id, price_before: before, price_after: price > 0 ? price : before, name_before: nameBefore, name_after: newName || nameBefore, status: res.status }, null, 2), { status: 200, headers: cors });
   } catch (e) {
     return new Response(JSON.stringify({ ok: false, error: String(e) }), { status: 500, headers: cors });
   }

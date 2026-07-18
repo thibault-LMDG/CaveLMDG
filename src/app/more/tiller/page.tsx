@@ -185,8 +185,14 @@ export default function TillerMappingPage() {
     setSaving(true)
     const colMap: Record<string, string> = { BLANC: 'Blc', ROUGE: 'Rge', 'ROSÉ': 'Rose', BULLE: 'Bulle', 'DEMI-SEC': 'Blc' }
     const catMap: Record<string, string> = { BLANC: 'Blancs New', ROUGE: 'Rouges New', 'ROSÉ': 'Rose New', BULLE: 'Bulles New', 'DEMI-SEC': 'Blancs New' }
-    const core = [wine.cave_domains?.nom, wine.cuvee].filter(Boolean).join(' ')
+    // Cuvée, sinon appellation : sans ça, deux vins d'un même domaine donnent le même nom en caisse
+    const core = [wine.cave_domains?.nom, wine.cuvee || wine.nom_appellation].filter(Boolean).join(' ')
     const name = `${core} - ${colMap[wine.type] || ''}`.trim()
+    if (catalog.some(p => p.is_active && p.name.trim().toLowerCase() === name.toLowerCase())) {
+      alert('❌ « ' + name + ' » existe déjà en caisse — relie-le manuellement au lieu de le recréer')
+      setSaving(false)
+      return
+    }
     try {
       const resp = await fetch('https://unlfsgolerufpbrqwvld.supabase.co/functions/v1/cave-create-product', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
