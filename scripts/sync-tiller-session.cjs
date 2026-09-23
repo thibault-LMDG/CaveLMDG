@@ -112,7 +112,10 @@ async function isSessionAlive(value) {
   const html = await res.text();
   const produits = new Set([...html.matchAll(/\/product\/(\d+)\/(?:edit\/popin|delete|visibility)/g)].map((m) => m[1]));
   if (!produits.size) return { ok: false, why: 'aucun produit dans la catégorie témoin' };
-  return { ok: true, produits: produits.size, marine: /marine des goudes/i.test(html) };
+  // Garde-fou : une session posée sur un autre établissement ferait créer les vins
+  // dans la mauvaise caisse. On exige La Marine des Goudes, noir sur blanc.
+  if (!/marine des goudes/i.test(html)) return { ok: false, why: 'établissement courant autre que La Marine des Goudes' };
+  return { ok: true, produits: produits.size };
 }
 
 async function currentStored(url, key) {
@@ -156,7 +159,7 @@ async function store(url, key, value) {
   if (!alive.ok) {
     fail(2, `session inutilisable (${alive.why}). Reconnecte-toi à ${BACKOFFICE} dans le Chrome dédié, sur le compte La Marine seul, puis relance.`);
   }
-  log(`session valide côté back-office (${alive.produits} produits dans la catégorie témoin${alive.marine ? ', établissement La Marine confirmé' : ''})`);
+  log(`session valide, La Marine des Goudes, ${alive.produits} produits dans la catégorie témoin`);
 
   if (CHECK_ONLY) { log('mode --check : rien écrit'); return; }
 
