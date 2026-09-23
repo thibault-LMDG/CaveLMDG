@@ -26,6 +26,10 @@
  */
 
 const BACKOFFICE = 'https://app.tillersystems.com/';
+// Route témoin : la liste de catégorie « Vin Verre », exactement ce qu'interroge
+// tiller-catalog-categorize. La racine du site, elle, bascule vers la nouvelle
+// interface même quand la session historique est bonne : elle ne prouve rien.
+const TEMOIN = 'https://app.tillersystems.com/inventory/category/list/4739833';
 const COOKIE_NAME = 'PHPSESSID';
 const CDP = process.env.CHROME_CDP_URL || 'http://127.0.0.1:9222';
 const CHECK_ONLY = process.argv.includes('--check');
@@ -57,12 +61,12 @@ async function cdp(path, init) {
 }
 
 /** Ouvre un onglet sur le back-office, attend le chargement, le referme. */
-async function touchBackoffice() {
+async function touchBackoffice(url = BACKOFFICE) {
   let target;
   try {
-    target = await cdp(`/json/new?${encodeURIComponent(BACKOFFICE)}`, { method: 'PUT' });
+    target = await cdp(`/json/new?${encodeURIComponent(url)}`, { method: 'PUT' });
   } catch {
-    target = await cdp(`/json/new?${encodeURIComponent(BACKOFFICE)}`, { method: 'POST' });
+    target = await cdp(`/json/new?${encodeURIComponent(url)}`, { method: 'POST' });
   }
   await new Promise((r) => setTimeout(r, 6000));
   if (target && target.id) await cdp(`/json/close/${target.id}`).catch(() => {});
@@ -88,17 +92,27 @@ async function readCookie() {
   return cookies.find((c) => c.name === COOKIE_NAME && /(^|\.)tillersystems\.com$/.test(c.domain.replace(/^\./, '.')));
 }
 
-/** Une session valide sert la page ; une session morte renvoie vers le SSO. */
+/**
+ * Session valide = la route témoin répond sur app.tillersystems.com avec des
+ * produits dedans. Une session morte, ou posée sur un compte multi-restaurants,
+ * atterrit sur new.tillersystems.com : le back-office historique ne sait pas
+ * quel catalogue viser.
+ */
 async function isSessionAlive(value) {
-  const res = await fetch(BACKOFFICE, {
-    headers: { cookie: `${COOKIE_NAME}=${value}`, 'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)' },
-    redirect: 'manual',
+  const res = await fetch(TEMOIN, {
+    headers: {
+      cookie: `${COOKIE_NAME}=${value}`,
+      'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+      'x-requested-with': 'XMLHttpRequest',
+    },
+    redirect: 'follow',
   });
-  const location = res.headers.get('location') || '';
-  if (res.status >= 300 && res.status < 400) {
-    if (/new\.tillersystems\.com|\/login|sumup/i.test(location)) return false;
-  }
-  return res.status === 200 || (res.status >= 300 && res.status < 400);
+  if (res.status !== 200) return { ok: false, why: `route témoin ${res.status}` };
+  if (/new\.tillersystems\.com|\/login/.test(res.url)) return { ok: false, why: 'renvoyé vers le SSO' };
+  const html = await res.text();
+  const produits = new Set([...html.matchAll(/\/product\/(\d+)\/(?:edit\/popin|delete|visibility)/g)].map((m) => m[1]));
+  if (!produits.size) return { ok: false, why: 'aucun produit dans la catégorie témoin' };
+  return { ok: true, produits: produits.size, marine: /marine des goudes/i.test(html) };
 }
 
 async function currentStored(url, key) {
@@ -130,7 +144,7 @@ async function store(url, key, value) {
   const key = process.env.CAVE_SUPABASE_SERVICE_ROLE_KEY;
   if (!CHECK_ONLY && (!url || !key)) fail(1, 'CAVE_SUPABASE_URL ou CAVE_SUPABASE_SERVICE_ROLE_KEY manquant');
 
-  await touchBackoffice().catch((e) => log('note: onglet de rafraîchissement non ouvert (', e.message, ')'));
+  await touchBackoffice(TEMOIN).catch((e) => log('note: onglet de rafraîchissement non ouvert (', e.message, ')'));
 
   const cookie = await readCookie().catch((e) => fail(1, `lecture du cookie impossible: ${e.message}`));
   if (!cookie) {
@@ -139,10 +153,10 @@ async function store(url, key, value) {
   log(`cookie trouvé (${cookie.value.length} caractères)`);
 
   const alive = await isSessionAlive(cookie.value);
-  if (!alive) {
-    fail(2, `session expirée côté SumUp. Reconnecte-toi à ${BACKOFFICE} dans le Chrome dédié, puis relance.`);
+  if (!alive.ok) {
+    fail(2, `session inutilisable (${alive.why}). Reconnecte-toi à ${BACKOFFICE} dans le Chrome dédié, sur le compte La Marine seul, puis relance.`);
   }
-  log('session valide côté back-office');
+  log(`session valide côté back-office (${alive.produits} produits dans la catégorie témoin${alive.marine ? ', établissement La Marine confirmé' : ''})`);
 
   if (CHECK_ONLY) { log('mode --check : rien écrit'); return; }
 
