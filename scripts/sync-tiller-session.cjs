@@ -32,6 +32,18 @@ const CHECK_ONLY = process.argv.includes('--check');
 
 const log = (...a) => console.log(new Date().toISOString(), ...a);
 
+/** Coffre à clés unique : ~/dev/secrets.env (lancement launchd = pas de shell). */
+function loadSecrets() {
+  if (process.env.CAVE_SUPABASE_SERVICE_ROLE_KEY) return;
+  const path = require('node:path').join(require('node:os').homedir(), 'dev', 'secrets.env');
+  let content;
+  try { content = require('node:fs').readFileSync(path, 'utf8'); } catch { return; }
+  for (const line of content.split('\n')) {
+    const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
+    if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+  }
+}
+
 function fail(code, message) {
   log('ECHEC:', message);
   process.exit(code);
@@ -113,6 +125,7 @@ async function store(url, key, value) {
 }
 
 (async () => {
+  loadSecrets();
   const url = process.env.CAVE_SUPABASE_URL;
   const key = process.env.CAVE_SUPABASE_SERVICE_ROLE_KEY;
   if (!CHECK_ONLY && (!url || !key)) fail(1, 'CAVE_SUPABASE_URL ou CAVE_SUPABASE_SERVICE_ROLE_KEY manquant');
